@@ -1,6 +1,7 @@
 import contextlib
 import functools
 import os
+import os.path
 from subprocess import check_output
 from tempfile import TemporaryDirectory
 
