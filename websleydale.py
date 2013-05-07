@@ -1,8 +1,9 @@
 #!/usr/bin/python3
-"""Usage: websleydale [-c <file>]
+"""Usage: websleydale [-c <file>] -o <dir>
 
 Options:
   -c <file>, --config <file>     Configuration file [default: config.yaml]
+  -o <dir>, --output <dir>       Output direcgtory [default: ./build]
   -h, --help                     Show this message
   --version                      Print the version
 
@@ -11,7 +12,7 @@ __version__ = 1
 
 import glob
 import os
-from os.path import basename, dirname, join
+from os.path import abspath, basename, dirname, join
 import shutil
 from subprocess import CalledProcessError, check_call, check_output
 import sys
@@ -32,8 +33,8 @@ log(_action("Loading"), _path(arguments['--config']))
 with open(arguments['--config']) as f:
     config = yaml.load(f)
 
-SOURCE_DIR = dirname(arguments['--config'])
-OUTPUT_DIR = join(SOURCE_DIR, config['output-dir'])
+SOURCE_DIR = abspath(dirname(arguments['--config']))
+OUTPUT_DIR = abspath(arguments['--output'])
 
 # Create the output directory
 try:
@@ -85,8 +86,7 @@ with chdir_temp() as temp_dir:
         # Create subdirs if needed
         subdirs = dirname(name)
         if subdirs:
-            os.makedirs(join(OUTPUT_DIR, subdirs),
-                        exist_ok=True)
+            os.makedirs(join(OUTPUT_DIR, subdirs), exist_ok=True)
         try:
             check_call(args)
         except CalledProcessError:
