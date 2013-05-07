@@ -8,7 +8,7 @@ Options:
   --version                      Print the version
 
 """
-__version__ = 1
+__version__ = "1.0"
 
 import glob
 import os
@@ -54,9 +54,7 @@ try:
 except CalledProcessError:
     pass
 vars['pandoc-version'] = pandoc_version()
-
-# Construct the menu?
-pass
+vars['websleydale-version'] = __version__
 
 # Compile pages
 with chdir_temp() as temp_dir:
@@ -72,6 +70,7 @@ with chdir_temp() as temp_dir:
             args.extend(['-H', join(SOURCE_DIR, header)])
         for var, value in vars.items():
             args.extend(['-V', '{}={}'.format(var, value)])
+
         # Build list of sources
         sources = []
         for source in listify(info.get('source', [])):
@@ -83,6 +82,15 @@ with chdir_temp() as temp_dir:
                 sources.append(join(SOURCE_DIR, source))
         args.extend(sources)
         log(_action("Compiling"), _name(output_path))
+
+        # Construct the menu?
+        menu_items = []
+        for item_name, item_url in config['menu']:
+            active = ' class="active"' if item_url == name else ''
+            i = '<li><a href="{item_url}"{active}>{item_name}</a></li>'
+            menu_items.append(i.format(**locals()))
+        args.extend(['-V', 'menu={}'.format('<!--\n-->'.join(menu_items))])
+
         # Create subdirs if needed
         subdirs = dirname(name)
         if subdirs:
