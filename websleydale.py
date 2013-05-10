@@ -119,6 +119,9 @@ def main():
                 args.extend(['-H', join(SOURCE_DIR, header)])
             for var, value in vars.items():
                 args.extend(['-V', '{}={}'.format(var, value)])
+            github = info.get('github', '')
+            if github:
+                args.extend(['-V', 'github={}'.format(github)])
 
             # Construct the menu?
             menu_items = []
