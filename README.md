@@ -28,14 +28,15 @@ important part; it maps URLs to their source file(s).
 %YAML 1.2
 ---
 copy:
-  share/css: css
-  share/font: font
-  share/image: image
+  css: css
+  font: font
+  image: image
 template: templates/lumeh.html
 menu: !!omap
   - index: /index.html
   - music: /music.html
   - projects: /projects/
+  - recipes: /recipes/
   - wiki: /wiki/
   - chorus: /chorus/
   - MUTAP: /mutap/
@@ -54,23 +55,51 @@ pages:
   narchanso-twice.html:
     source: [pages/narchanso.pd, pages/narchanso.pd]
     toc: yes
-  games/narchanso.html:
-    source: pages/narchanso.pd
-    toc: yes
-  projects/index.html:
-    source: pages/projects.pd
-  projects/think-green/index.html:
-    source: https://raw.github.com/kalgynirae/thinking-green/master/README
-  projects/recipes/cookies_summary.html:
-    source: https://raw.github.com/kalgynirae/recipes/master/cookies_summary.html
-  projects/mideast-sidearm-hideaway/index.html:
-    source: https://raw.github.com/kalgynirae/mideast-sidearm-hideaway/master/README.md
-  projects/websleydale/index.html:
-    source: https://raw.github.com/kalgynirae/websleydale/master/README.md
-  projects/routemaster/index.html:
-    source: https://raw.github.com/routemaster/routemaster-frontend/master/README.md
-  projects/golfram-alpha/index.html:
-    source: https://raw.github.com/kalgynirae/Golfram-Alpha/master/README
+  games:
+    narchanso.html:
+      source: pages/narchanso.pd
+      toc: yes
+  recipes: !github
+    repo: kalgynirae/recipes
+    index.html:
+      source: README.md
+    chili.html:
+      source: chili.pd
+    cookies.html:
+      source: cookies.pd
+    creme_brulee_cheesecake.html:
+      source: creme_brulee_cheesecake.pd
+    curry.html:
+      source: curry.pd
+    krishna_dressing.html:
+      source: krishna_dressing.pd
+    sweet_potato_casserole.html:
+      source: sweet_potato_casserole.pd
+  projects:
+    index.html:
+      source: pages/projects_index.html
+    think-green: !github
+      repo: kalgynirae/thinking-green
+      index.html:
+        source: README
+    mideast-sidearm-hideaway: !github
+      repo: kalgynirae/mideast-sidearm-hideaway
+      index.html:
+        source: README.md
+        toc: yes
+    websleydale: !github
+      repo: kalgynirae/websleydale
+      index.html:
+        source: README.md
+    routemaster: !github
+      repo: routemaster/routemaster-frontend
+      index.html:
+        source: README.md
+        toc: yes
+    golfram-alpha: !github
+      repo: kalgynirae/Golfram-Alpha
+      index.html:
+        source: README
 ```
 
 [pandoc]: http://www.johnmacfarlane.net/pandoc/
