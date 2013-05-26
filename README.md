@@ -6,12 +6,12 @@ configuration file. (…and figure out how to install Pandoc. …and PyYAML.)
 
 1.  Author your website pages in [Pandoc's markdown format][pandoc-markdown].
 
-2.  Write a config file that maps your source files to their URLs. See the
+2.  Write a `config.yaml` that maps your source files to their URLs. See the
     sample below.
 
 3.  Run websleydale.
 
-        $ python3 websleydale.py -c <your config file> -o <output directory>
+        $ python3 websleydale.py -o <output directory>
 
 ### Sample configuration file
 
