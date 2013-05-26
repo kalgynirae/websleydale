@@ -1,12 +1,13 @@
 #!/usr/bin/python3
 """Websleydale compiles your web site from a bunch of source files.
 
-Usage: websleydale [-chv] [-s <dir>] -o <dir>
+Usage: websleydale [-cnhv] [-s <dir>] -o <dir>
 
 Options:
   -s <dir>, --source <dir>      Source directory [default: .]
   -o <dir>, --output <dir>      Output direcgtory [default: ./build]
   -c, --copy-only               Only copy static files
+  -n, --no-github               Skip cloning Github repositories
   -h, --help                    Show this message
   -v, --version                 Print the version
 """
@@ -171,15 +172,16 @@ def main():
         with tempfile.TemporaryDirectory() as tempdir:
 
             # Clone githubs
-            for github in githubs:
-                log(_action("Cloning"), _name(github['repo']))
-                args = ['git', 'clone', '--depth', '1', '--branch',
-                        github['branch'], github_clone_url(github['repo']),
-                        join(tempdir, github['repo'])]
-                try:
-                    subprocess.check_call(args)
-                except subprocess.CalledProcessError:
-                    log(_error("Clone failed:"), _name(github['repo']))
+            if not arguments.get('--no-github', False):
+                for github in githubs:
+                    log(_action("Cloning"), _name(github['repo']))
+                    args = ['git', 'clone', '--depth', '1', '--branch',
+                            github['branch'], github_clone_url(github['repo']),
+                            join(tempdir, github['repo'])]
+                    try:
+                        subprocess.check_call(args)
+                    except subprocess.CalledProcessError:
+                        log(_error("Clone failed:"), _name(github['repo']))
 
             # Compile pages
             for page in pages:
