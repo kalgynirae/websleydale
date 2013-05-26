@@ -2,27 +2,31 @@
 files with [Pandoc][pandoc]. All you have to do is write a simple YAML
 configuration file. (…and figure out how to install Pandoc. …and PyYAML.)
 
-## Usage
+# Usage
 
 1.  Author your website pages in [Pandoc's markdown format][pandoc-markdown].
 
-2.  Write a `config.yaml` that maps your source files to their URLs. See the
-    sample below.
+2.  Write a `config.yaml` in the root of your source directory that maps URLs
+    to their source files. See the sample below.
 
-3.  Run websleydale.
+3.  Run Websleydale:
 
-        $ python3 websleydale.py -o <output directory>
+        $ python3 websleydale.py -s . -o build
 
-### Sample configuration file
+    This tells Websleydale that `config.yaml` is in the current directory
+    (`.`) and that all output should go into the `build` directory.
+    Websleydale defaults to using the current directory as the source
+    directory but provides the `-s` flag to specify a different directory.
 
-This is the configuration I'm using for lumeh.org. Paths in the config file are
-interpreted as relative to the config file (so if the config file is
-`/foo/bar/config.yaml` then `pages/music.pd` means `/foo/bar/pages/music.pd`).
-The `copy` section says to copy certain dirs into the output directory (e.g.,
-`/foo/bar/share/css` copies to `/foo/bar/output/css` if `/foo/bar/output` is
-the output directory). The template is simply passed to Pandoc. The `menu`
-section is largely tied to my template at the moment. The `pages` is the
-important part; it maps URLs to their source file(s).
+## Sample configuration file
+
+This is the configuration I'm using for [lumeh.org]. Paths in the config file
+are interpreted as relative to the source directory. The `copy` section says to
+copy certain dirs into the output directory (e.g., `{source-dir}/music` copies
+to `{output-dir}/music/files`). The template is simply passed to Pandoc. The
+`menu` section defines a global site menu, the formatting of which is largely
+tied to my template at the moment. The `pages` is the important part; it maps
+URLs to their source file(s).
 
 ```yaml
 %YAML 1.2
@@ -31,6 +35,7 @@ copy:
   css: css
   font: font
   image: image
+  music: music/files
 template: templates/lumeh.html
 menu: !!omap
   - index: /index.html
@@ -52,12 +57,17 @@ pages:
   krypto.html:
     source: pages/krypto.pd
     header: pages/krypto.header
-  narchanso-twice.html:
-    source: [pages/narchanso.pd, pages/narchanso.pd]
-    toc: yes
+  wiki:
+    dragee.html:
+      source: pages/wiki/dragee.pd
+    early-twenty-first-century.html:
+      source: pages/wiki/early-twenty-first-century.pd
   games:
     narchanso.html:
-      source: pages/narchanso.pd
+      source: pages/games/narchanso.pd
+      toc: yes
+    the-base-game.html:
+      source: pages/games/the-base-game.pd
       toc: yes
   recipes: !github
     repo: kalgynirae/recipes
@@ -100,7 +110,12 @@ pages:
       repo: kalgynirae/Golfram-Alpha
       index.html:
         source: README
+  testing:
+    narchanso-twice.html:
+      source: [pages/games/narchanso.pd, pages/games/narchanso.pd]
+      toc: yes
 ```
 
 [pandoc]: http://www.johnmacfarlane.net/pandoc/
 [pandoc-markdown]: http://www.johnmacfarlane.net/pandoc/README.html#pandocs-markdown
+[lumeh.org]: http://lumeh.org/
