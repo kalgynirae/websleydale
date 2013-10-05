@@ -1,6 +1,12 @@
 **Websleydale** is a Python 3 program that builds your website by compiling source
-files with [Pandoc][pandoc]. All you have to do is write a simple YAML
+files with [Pandoc]. All you have to do is write a simple YAML
 configuration file. (…and figure out how to install Pandoc. …and PyYAML.)
+
+# Prerequisites
+
+*   [Pandoc]
+*   [PyYAML]
+*   [docopt]
 
 # Usage
 
@@ -9,7 +15,13 @@ configuration file. (…and figure out how to install Pandoc. …and PyYAML.)
 2.  Write a `config.yaml` in the root of your source directory that maps URLs
     to their source files. See the sample below.
 
-3.  Run Websleydale:
+3.  Make a template file. Pandoc uses a template to convert your
+    Pandoc-markdown files to HTML. See the [Pandoc
+    docs](http://www.johnmacfarlane.net/pandoc/README.html#templates)
+    for more details. You can start with the [Pandoc's default HTML5
+    template](https://github.com/jgm/pandoc-templates/blob/master/default.html5).
+
+4.  Run Websleydale:
 
         $ python3 websleydale.py -s . -o build
 
@@ -117,5 +129,7 @@ pages:
 ```
 
 [pandoc]: http://www.johnmacfarlane.net/pandoc/
+[pyyaml]: http://pyyaml.org/
+[docopt]: http://docopt.org/
 [pandoc-markdown]: http://www.johnmacfarlane.net/pandoc/README.html#pandocs-markdown
 [lumeh.org]: http://lumeh.org/
