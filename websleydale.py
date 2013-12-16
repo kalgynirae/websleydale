@@ -5,7 +5,7 @@ Usage: websleydale [-cnhv] [-s <dir>] -o <dir>
 
 Options:
   -s <dir>, --source <dir>      Source directory [default: .]
-  -o <dir>, --output <dir>      Output direcgtory [default: ./build]
+  -o <dir>, --output <dir>      Output directory
   -c, --copy-only               Only copy static files
   -n, --no-git                  Skip cloning git repositories
   -h, --help                    Show this message
