@@ -7,11 +7,11 @@ Options:
   -s <dir>, --source <dir>      Source directory [default: .]
   -o <dir>, --output <dir>      Output direcgtory [default: ./build]
   -c, --copy-only               Only copy static files
-  -n, --no-github               Skip cloning Github repositories
+  -n, --no-git                  Skip cloning git repositories
   -h, --help                    Show this message
   -v, --version                 Print the version
 """
-__version__ = "1.1"
+__version__ = "1.2-alpha"
 
 import contextlib
 import os
@@ -25,13 +25,13 @@ import time
 from docopt import docopt
 import yaml
 
-class Github(dict):
-    """Special dict for representing Github repositories"""
+class Git(dict):
+    """Special dict for representing git repositories"""
     @classmethod
     def construct(cls, loader, node):
         d = loader.construct_mapping(node)
         return cls(d)
-yaml.add_constructor('!github', Github.construct)
+yaml.add_constructor('!git', Git.construct)
 
 @contextlib.contextmanager
 def chdir(path):
@@ -42,7 +42,7 @@ def chdir(path):
     finally:
         os.chdir(cwd)
 
-def git_repo_version(repo_path):
+def git_version(repo_path):
     try:
         with chdir(repo_path):
             version = (subprocess.check_output(['git', 'describe', '--tags'])
@@ -51,11 +51,19 @@ def git_repo_version(repo_path):
         version = None
     return version
 
-def github_clone_url(repo):
-    return 'https://github.com/{}.git'.format(repo)
+def git_name(clone_url):
+    """Return a friendly name for the given git clone URL
 
-def github_web_url(repo):
-    return 'https://github.com/{}'.format(repo)
+    Currently this only works for https GitHub URLs.
+    """
+    return clone_url.rstrip('.git').lstrip('https://github.com/')
+
+def git_web_url(clone_url):
+    """Return the web url for the given git clone URL
+
+    Currently this only works for https GitHub URLs.
+    """
+    return clone_url.rstrip('.git')
 
 def highlighter(color=None, bg_color=None, style=None):
     SET_FG_COLOR = '\x1b[3{}m'
@@ -99,13 +107,13 @@ def pandoc_version():
     output = subprocess.check_output(['pandoc', '-v']).decode()
     return output.split('\n')[0].split()[1]
 
-def parse_pages(config, base_path='', github_repo=None):
-    githubs = []
+def parse_pages(config, base_path='', git_repo=None):
+    gits = []
     pages = []
     for path, config in config.items():
         if 'source' in config:
             # config is a dict for a page
-            page = {'github-repo': False, 'header': [], 'source': [],
+            page = {'git-repo': False, 'header': [], 'source': [],
                     'toc': False}
             for key in page:
                 if key == 'source':
@@ -115,31 +123,31 @@ def parse_pages(config, base_path='', github_repo=None):
                         page[key] = config[key]
                     except KeyError:
                         pass
-            page['github-repo'] = github_repo
+            page['git-repo'] = git_repo
             page['path'] = join(base_path, path)
             pages.append(page)
-        elif isinstance(config, Github):
-            if github_repo:
-                raise ValueError("Nested Github repos are not supported")
-            # config is a dict for a Github repo
-            github = {'branch': 'master', 'repo': None}
-            for key in github:
+        elif isinstance(config, Git):
+            if git_repo:
+                raise ValueError("Nested git repos are not supported")
+            # config is a dict for a git repo
+            git = {'branch': 'master', 'repo': None}
+            for key in git:
                 try:
-                    github[key] = config[key]
+                    git[key] = config[key]
                 except KeyError:
                     pass
                 else:
                     del config[key]
-            github['path'] = join(base_path, path)
-            githubs.append(github)
-            _pages, _ = parse_pages(config, github['path'], github['repo'])
+            git['path'] = join(base_path, path)
+            gits.append(git)
+            _pages, _ = parse_pages(config, git['path'], git['repo'])
             pages.extend(_pages)
         else:
-            # config is a dict for a subdir containing pages and/or githubs
-            _pages, _githubs = parse_pages(config, join(base_path, path))
+            # config is a dict for a subdir containing pages and/or gits
+            _pages, _gits = parse_pages(config, join(base_path, path))
             pages.extend(_pages)
-            githubs.extend(_githubs)
-    return pages, githubs
+            gits.extend(_gits)
+    return pages, gits
 
 def main():
     arguments = docopt(__doc__, version=__version__)
@@ -149,7 +157,7 @@ def main():
     log(_action("Loading"), _path(config_path))
     with open(config_path) as f:
         config = yaml.load(f)
-    pages, githubs = parse_pages(config['pages'])
+    pages, gits = parse_pages(config['pages'])
 
     SOURCE_DIR = arguments['--source']
     if SOURCE_DIR == '.':
@@ -164,24 +172,24 @@ def main():
     vars['time'] = time.strftime('%Y-%m-%dT%H:%M:%S%z')
     vars['pandoc-version'] = pandoc_version()
     vars['websleydale-version'] = __version__
-    source_version = git_repo_version(SOURCE_DIR or '.')
+    source_version = git_version(SOURCE_DIR or '.')
     if source_version:
         vars['source-version'] = source_version
 
     if not arguments.get('--copy-only', False):
         with tempfile.TemporaryDirectory() as tempdir:
 
-            # Clone githubs
-            if not arguments.get('--no-github', False):
-                for github in githubs:
-                    log(_action("Cloning"), _name(github['repo']))
+            # Clone gits
+            if not arguments.get('--no-git', False):
+                for git in gits:
+                    log(_action("Cloning"), _name(git['repo']))
                     args = ['git', 'clone', '--depth', '1', '--branch',
-                            github['branch'], github_clone_url(github['repo']),
-                            join(tempdir, github['repo'])]
+                            git['branch'], git['repo'],
+                            join(tempdir, git['repo'])]
                     try:
                         subprocess.check_call(args)
                     except subprocess.CalledProcessError:
-                        log(_error("Clone failed:"), _name(github['repo']))
+                        log(_error("Clone failed:"), _name(git['repo']))
 
             # Compile pages
             for page in pages:
@@ -196,10 +204,11 @@ def main():
                     args.extend(['-H', join(SOURCE_DIR, header)])
                 for key, value in vars.items():
                     args.extend(['-V', '{}={}'.format(key, value)])
-                if page['github-repo']:
-                    url = github_web_url(page['github-repo'])
-                    args.extend(['-V', 'github={}'.format(page['github-repo']),
-                                 '-V', 'github-url={}'.format(url)])
+                if page['git-repo']:
+                    url = git_web_url(page['git-repo'])
+                    name = git_name(page['git-repo'])
+                    args.extend(['-V', 'git={}'.format(name),
+                                 '-V', 'git-url={}'.format(url)])
 
                 # Construct the menu
                 menu_items = []
@@ -218,8 +227,8 @@ def main():
                         log(_action("Fetching"), _path(source))
                         subprocess.check_call(['curl', '-OsS', source])
                         args.append(join(tempdir, basename(source)))
-                    elif page['github-repo']:
-                        args.append(join(tempdir, page['github-repo'], source))
+                    elif page['git-repo']:
+                        args.append(join(tempdir, page['git-repo'], source))
                     else:
                         args.append(join(SOURCE_DIR, source))
 
