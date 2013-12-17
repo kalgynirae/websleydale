@@ -160,8 +160,6 @@ def main():
     pages, gits = parse_pages(config['pages'])
 
     SOURCE_DIR = arguments['--source']
-    if SOURCE_DIR == '.':
-        SOURCE_DIR = ''
     OUTPUT_DIR = arguments['--output']
 
     # Create the output and staging directories if needed
@@ -172,7 +170,7 @@ def main():
     vars['time'] = time.strftime('%Y-%m-%dT%H:%M:%S%z')
     vars['pandoc-version'] = pandoc_version()
     vars['websleydale-version'] = __version__
-    source_version = git_version(SOURCE_DIR or '.')
+    source_version = git_version(SOURCE_DIR)
     if source_version:
         vars['source-version'] = source_version
 
