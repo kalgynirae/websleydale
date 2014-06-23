@@ -1,34 +1,33 @@
+import asyncio
+import collections
 import collections.abc
 import pathlib
+import shutil
 
+from . import log
 from . import sources
-from . import util
 
 __version__ = "2.0-alpha1"
 
-def build(things, *, dest_dir="build", menu=None, prefix=None, redirects=None,
-          template=None):
-    if prefix is None:
-        prefix = pathlib.Path(dest_dir)
-    if not prefix.exists():
-        prefix.mkdir()
-    util.mkdir_if_needed(dest_dir)
-    for path_component, thing in things.items():
-        path = prefix / path_component
-        if isinstance(thing, collections.abc.Mapping):
-            build(thing, dest_dir=dest_dir, menu=menu, prefix=path,
-                  redirects=redirects, template=template)
+def _flatten(tree, prefix=pathlib.Path()):
+    for key, value in tree.items():
+        path = prefix / key
+        if isinstance(value, collections.abc.Mapping):
+            yield from _flatten(value, prefix=path)
         else:
-            print("{}: {!r}".format(util._path(path), thing))
+            yield (path, value)
 
-def pandoc(file, header=None, toc=False):
-    return file
+def build(tree):
+    things = collections.OrderedDict(sorted(_flatten(tree)))
+    tasks = []
+    for destination, source_coro in things.items():
+        assert asyncio.iscoroutine(source_coro), (
+                "%s: not a coroutine: %r" % (destination, source_coro))
+        tasks.append(asyncio.Task(copy(source_coro, destination)))
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(asyncio.wait(tasks))
 
-def index(things):
-    if "index.html" in things:
-        raise ValueError("index.html already exists")
-    things["index.html"] = pandoc(index_page_generator(things))
-    return things
-
-def index_page_generator(things):
-    yield "INDEX PAGE!!"
+def copy(source_coro, dest):
+    source = yield from source_coro
+    log.info("Copying {} to {}", source, dest)
+    #shutil.copy(source, dest)
