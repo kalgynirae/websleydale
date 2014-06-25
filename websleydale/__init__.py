@@ -6,10 +6,11 @@ import shutil
 
 from . import log
 from . import sources
+from . import util
 
 __version__ = "2.0-alpha1"
 
-def _flatten(tree, prefix=pathlib.Path()):
+def _flatten(tree, prefix):
     for key, value in tree.items():
         path = prefix / key
         if isinstance(value, collections.abc.Mapping):
@@ -17,8 +18,11 @@ def _flatten(tree, prefix=pathlib.Path()):
         else:
             yield (path, value)
 
-def build(tree):
-    things = collections.OrderedDict(sorted(_flatten(tree)))
+def build(output_dir, tree):
+    output_dir = pathlib.Path(output_dir)
+    util.mkdir_if_needed(output_dir)
+    log.info("Outputting to {}", output_dir)
+    things = collections.OrderedDict(sorted(_flatten(tree, output_dir)))
     tasks = []
     for destination, source_coro in things.items():
         assert asyncio.iscoroutine(source_coro), (
@@ -29,5 +33,6 @@ def build(tree):
 
 def copy(source_coro, dest):
     source = yield from source_coro
-    log.info("Copying {} to {}", source, dest)
-    #shutil.copy(source, dest)
+    log.info("Renaming {} to {}", source, dest)
+    util.mkdir_if_needed(dest.parent)
+    source.rename(dest)

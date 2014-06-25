@@ -6,11 +6,9 @@ from . import log
 
 def mkdir_if_needed(path):
     try:
-        os.makedirs(path, exist_ok=True)
-    except FileExistsError as e:
-        # makedirs() will raise even with exist_ok=True in some cases, e.g.,
-        # when the permissions on the directory are weird. But we don't care.
-        log.info("Ignoring weird permissions on {}", path)
+        path.mkdir(parents=True)
+        log.info("Created directory {}", path)
+    except FileExistsError:
         pass
 
 _tempdir = None

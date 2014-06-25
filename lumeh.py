@@ -46,4 +46,4 @@ tree = {
     "wiki": local.auto("wiki"),
 }
 
-build(tree)
+build("out", tree)

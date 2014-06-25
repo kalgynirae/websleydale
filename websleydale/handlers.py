@@ -19,12 +19,13 @@ def pandoc(in_path_coro, *, header=None, template=None, toc=False):
     in_path = yield from in_path_coro
     out_path = temporary_file('.html')
 
-    args = ['pandoc', in_path, '--output=%s' % out_path, '--to=html5',
+    args = ['pandoc', str(in_path), '--output=%s' % out_path, '--to=html5',
             '--standalone']
     if toc:
         args.append('--toc')
     log.info("Pandocing {} to {}", in_path, out_path)
-    #TODO: process = yield from asyncio.create_subprocess_exec(*args)
-    #return_code = yield from process.wait()
+
+    process = yield from asyncio.create_subprocess_exec(*args)
+    return_code = yield from process.wait()
 
     return out_path
