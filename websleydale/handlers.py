@@ -1,8 +1,9 @@
 import asyncio
 import functools
+import shutil
 
 from . import log
-from .util import temporary_file
+from . import util
 
 def index(tree):
     assert 'index.html' not in tree
@@ -11,13 +12,20 @@ def index(tree):
 
 def _index_page(tree):
     yield from asyncio.sleep(0)
-    out_path = temporary_file('.html')
+    out_path = util.temporary_file('.html')
     return out_path
+
+def move(source_coro, dest):
+    source = yield from source_coro
+    log.info("Moving {} to {}", source, dest)
+    util.mkdir_if_needed(dest.parent)
+    shutil.move(str(source), str(dest))
+    return dest
 
 @asyncio.coroutine
 def pandoc(in_path_coro, *, header=None, template=None, toc=False):
     in_path = yield from in_path_coro
-    out_path = temporary_file('.html')
+    out_path = util.temporary_file('.html')
 
     args = ['pandoc', str(in_path), '--output=%s' % out_path, '--to=html5',
             '--standalone']

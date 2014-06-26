@@ -2,8 +2,8 @@ import asyncio
 import collections
 import collections.abc
 import pathlib
-import shutil
 
+from . import handlers
 from . import log
 from . import sources
 from . import util
@@ -18,21 +18,22 @@ def _flatten(tree, prefix):
         else:
             yield (path, value)
 
+def _run(coros):
+    for future in asyncio.as_completed(coros):
+        try:
+            result = yield from future
+        except Exception as e:
+            log.warning("{}: {}", e.__class__.__name__, str(e))
+
 def build(output_dir, tree):
     output_dir = pathlib.Path(output_dir)
     util.mkdir_if_needed(output_dir)
     log.info("Outputting to {}", output_dir)
     things = collections.OrderedDict(sorted(_flatten(tree, output_dir)))
-    tasks = []
+    coros = []
     for destination, source_coro in things.items():
         assert asyncio.iscoroutine(source_coro), (
                 "%s: not a coroutine: %r" % (destination, source_coro))
-        tasks.append(asyncio.Task(copy(source_coro, destination)))
+        coros.append(handlers.move(source_coro, destination))
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(asyncio.wait(tasks))
-
-def copy(source_coro, dest):
-    source = yield from source_coro
-    log.info("Renaming {} to {}", source, dest)
-    util.mkdir_if_needed(dest.parent)
-    source.rename(dest)
+    loop.run_until_complete(_run(coros))
