@@ -1,15 +1,9 @@
-#/usr/bin/env python3
 import asyncio
-import logging
 import pathlib
 from urllib.parse import urlsplit
 
 from . import log
-from .handlers import pandoc
 from .util import temporary_dir
-
-class GitError(Exception):
-    pass
 
 class Dir:
     def __init__(self, path='.'):
@@ -17,15 +11,13 @@ class Dir:
         if not self.directory.is_dir():
             raise ValueError("not a directory: %s" % path)
 
+    @asyncio.coroutine
     def __getitem__(self, key):
         yield from asyncio.sleep(0)
         return self.directory / key
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__, str(self.directory))
-
-    def auto(self, path='.'):
-        return {p: pandoc(self[p]) for p in (self.directory / path).iterdir()}
 
 class Git:
     def __init__(self, clone_url, checkout=None, directory=None):
@@ -55,11 +47,6 @@ class Git:
     def __repr__(self):
         return '{}({!r}, checkout={!r})'.format(self.__class__, self.clone_url,
                                                 self.checkout)
-
-    def auto(self, path='.'):
-        log.warning("Git.auto() is broken")
-        # The directory is still empty when the iterdir() happens
-        return {p: pandoc(self[p]) for p in (self.directory / path).iterdir()}
 
     @asyncio.coroutine
     def _clone(self):
@@ -96,3 +83,6 @@ class Git:
         output, _ = yield from process.communicate()
         self.version = output.decode().strip()
         log.info("Checked out {} from {}", self.version, self.clone_url)
+
+class GitError(Exception):
+    pass

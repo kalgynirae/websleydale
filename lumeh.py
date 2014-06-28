@@ -23,6 +23,7 @@ menu = [
 
 redirects = {
     "/games/narchanso.html": "/wiki/narchanso-ball.html",
+    "/recipes/mung_bean_dahl.html": "/recipes/mung_bean_dal.html",
 }
 
 tree = {
@@ -35,7 +36,20 @@ tree = {
     "cafe": {
         "index.html": local["cafe/index.html"],
     },
-    "recipes": recipes.auto(),
+    "recipes": index({
+        "%s.html" % name: pandoc(recipes["%s.pd" % name]) for name in [
+            "chili",
+            "christmas_anything",
+            "cookies",
+            "creme_brulee_cheesecake",
+            "curry",
+            "krishna_dressing",
+            "mung_bean_dal",
+            "pumpkin_bread",
+            "sugar_cookies",
+            "sweet_potato_casserole",
+        ]
+    }),
     "projects": index({
         "rockuefort/index.html": pandoc(rockuefort["README.md"]),
         "routemaster/index.html": pandoc(routemaster["README.md"], toc=True),
@@ -43,7 +57,12 @@ tree = {
         "think-green/index.html": pandoc(think_green["README.md"]),
         "websleydale/index.html": pandoc(websleydale_["README.md"]),
     }),
-    "wiki": local.auto("wiki"),
+    "wiki": index({
+        "%s.html" % name: pandoc(local["wiki/%s.pd" % name]) for name in [
+            "dragee",
+            "early-twenty-first-century",
+        ]
+    }),
 }
 
 build("out", tree)

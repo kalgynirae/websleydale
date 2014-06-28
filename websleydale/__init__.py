@@ -3,7 +3,7 @@ import collections
 import collections.abc
 import pathlib
 
-from . import handlers
+from . import actions
 from . import log
 from . import sources
 from . import util
@@ -29,11 +29,11 @@ def build(output_dir, tree):
     output_dir = pathlib.Path(output_dir)
     util.mkdir_if_needed(output_dir)
     log.info("Outputting to {}", output_dir)
-    things = collections.OrderedDict(sorted(_flatten(tree, output_dir)))
+
     coros = []
-    for destination, source_coro in things.items():
+    for destination, source_coro in _flatten(tree, output_dir):
         assert asyncio.iscoroutine(source_coro), (
                 "%s: not a coroutine: %r" % (destination, source_coro))
-        coros.append(handlers.move(source_coro, destination))
+        coros.append(actions.move(source_coro, destination))
     loop = asyncio.get_event_loop()
     loop.run_until_complete(_run(coros))

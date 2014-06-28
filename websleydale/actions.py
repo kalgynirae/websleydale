@@ -17,7 +17,7 @@ def _index_page(tree):
 
 def move(source_coro, dest):
     source = yield from source_coro
-    log.info("Moving {} to {}", source, dest)
+    log.info("{} -> {}", source, dest)
     util.mkdir_if_needed(dest.parent)
     shutil.move(str(source), str(dest))
     return dest
@@ -31,7 +31,7 @@ def pandoc(in_path_coro, *, header=None, template=None, toc=False):
             '--standalone']
     if toc:
         args.append('--toc')
-    log.info("Pandocing {} to {}", in_path, out_path)
+    log.info("pandoc {} --output={}", in_path, out_path)
 
     process = yield from asyncio.create_subprocess_exec(*args)
     return_code = yield from process.wait()
