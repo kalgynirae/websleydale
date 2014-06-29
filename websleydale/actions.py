@@ -27,8 +27,13 @@ def pandoc(in_path_coro, *, header=None, template=None, toc=False):
     in_path = yield from in_path_coro
     out_path = util.temporary_file('.html')
 
-    args = ['pandoc', str(in_path), '--output=%s' % out_path, '--to=html5',
-            '--standalone']
+    args = [
+        'pandoc',
+        str(in_path),
+        '--output=%s' % out_path,
+        '--to=html5',
+        '--standalone',
+    ]
     if toc:
         args.append('--toc')
     log.info("pandoc {} --output={}", in_path, out_path)
