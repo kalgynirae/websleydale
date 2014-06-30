@@ -23,7 +23,8 @@ def move(source_coro, dest):
     return dest
 
 @asyncio.coroutine
-def pandoc(in_path_coro, *, header=None, template=None, toc=False):
+def pandoc(in_path_coro, *, header=None, template=None, toc=False, menu=True):
+    menu_path = yield from menu_task
     in_path = yield from in_path_coro
     out_path = util.temporary_file('.html')
 
@@ -33,9 +34,17 @@ def pandoc(in_path_coro, *, header=None, template=None, toc=False):
         '--output=%s' % out_path,
         '--to=html5',
         '--standalone',
+        '--preserve-tabs',
+        '--template=%s' % template,
+        '--variable=arg:arg',
+        '--highlight-style=tango',
+        '--include-after-body=%s' % footer,
+        '--css=%s' % css,
     ]
     if toc:
         args.append('--toc')
+    if menu:
+        args.append('--include-before-body=%s' % menu_path)
     log.info("pandoc {} --output={}", in_path, out_path)
 
     process = yield from asyncio.create_subprocess_exec(*args)

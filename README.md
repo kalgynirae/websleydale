@@ -10,8 +10,8 @@ compiling source files with [Pandoc].
 
 1.  Author your website pages in [Pandoc's markdown format][pandoc-markdown].
 
-2.  Write a `websleydale.py` script in the root of your source directory
-    that maps URLs to their source files. See the sample below.
+2.  Write a `websleydale.py` script in the root of your project directory
+    that maps output filenames to their sources. See the sample below.
 
 3.  Make a template file. Pandoc uses a template to convert your
     Pandoc-markdown files to HTML. See the [Pandoc
@@ -19,11 +19,12 @@ compiling source files with [Pandoc].
     for more details. You can start with the [Pandoc's default HTML5
     template](https://github.com/jgm/pandoc-templates/blob/master/default.html5).
 
-4.  Run Websleydale:
+4.  Run `wb` (Websleydale build):
 
-        $ python3 websleydale.py -s . -o build
+        $ wb path/to/project
 
-    This tells Websleydale that `config.yaml` is in the current directory
+    Websleydale will load the `websleydale.py` file from the directory
+    you specify.
     (`.`) and that all output should go into the `build` directory.
     Websleydale defaults to using the current directory as the source
     directory but provides the `-s` flag to specify a different directory.
