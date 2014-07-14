@@ -3,6 +3,7 @@ import sys
 
 _color = True
 _log_file = sys.stderr
+_debug = True
 _verbose = True
 
 def _c(test, color, bg_color=None, style=None, conv=str):
@@ -11,9 +12,9 @@ def _c(test, color, bg_color=None, style=None, conv=str):
 _color_rules = [
     _c(lambda x: isinstance(x, pathlib.Path), 'blue'),
     _c(lambda x: str(x).startswith('http'), 'cyan'),
-    _c(lambda x: str(x).startswith('<'), 'yellow'),
-    _c(lambda x: str(x).startswith('Warning'), 'red'),
-    _c(lambda x: True, 'green'),
+    _c(lambda x: str(x).startswith('warning'), 'red'),
+    _c(lambda x: str(x).startswith('debug'), 'yellow'),
+    _c(lambda x: not isinstance(x, str), 'green'),
 ]
 
 _COLOR_NAMES = 'black red green yellow blue magenta cyan white'.split()
@@ -23,7 +24,7 @@ _SET_BG_COLOR = '\x1b[4%sm'
 _SET_FG_COLOR = '\x1b[3%sm'
 _SET_STYLE = '\x1b[%sm'
 _STYLES = {'bold': 1, 'underline': 4}
-def _colored(obj):
+def colorize(obj):
     for test, color, bg_color, style, conv in _color_rules:
         if test(obj):
             if color:
@@ -35,13 +36,19 @@ def _colored(obj):
     else:
         return obj
 
-def _loginate_it_up(message, *args):
-    #print('▶', end=' ', file=_log_file)
-    print(message.format(*map(_colored, args)), file=_log_file)
+def format(message, *args):
+    return colorize(message).format(*map(colorize, args))
+
+def _loginate_it_up(message):
+    print(message, file=_log_file)
+
+def debug(message, *args):
+    if _debug:
+        _loginate_it_up(format("debug: " + message, *args))
 
 def info(message, *args):
     if _verbose:
-        _loginate_it_up(message, *args)
+        _loginate_it_up(format(message, *args))
 
 def warning(message, *args):
-    _loginate_it_up(_colored("Warning: ") + message, *args)
+    _loginate_it_up(format("warning: " + message, *args))

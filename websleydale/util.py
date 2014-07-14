@@ -7,7 +7,7 @@ from . import log
 def mkdir_if_needed(path):
     try:
         path.mkdir(parents=True)
-        log.info("Created directory {}", path)
+        log.debug("Created directory {}", path)
     except FileExistsError:
         pass
 
@@ -16,7 +16,7 @@ def _make_tempdir():
     global _tempdir
     if _tempdir is None:
         _tempdir = tempfile.TemporaryDirectory(prefix="websleydale-")
-        log.info("Using temporary directory {}", _tempdir)
+        log.debug("Using temporary directory {}", _tempdir)
 
 def temporary_file(suffix=''):
     _make_tempdir()
