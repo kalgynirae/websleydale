@@ -29,17 +29,87 @@ compiling source files with [Pandoc].
     Websleydale defaults to using the current directory as the source
     directory but provides the `-s` flag to specify a different directory.
 
-## Sample configuration file
+## Sample websleydalerc.py file
 
-This is the configuration I'm using for [lumeh.org]. Paths in the config file
-are interpreted as relative to the source directory. The `copy` section says to
-copy certain dirs into the output directory (e.g., `{source-dir}/music` copies
-to `{output-dir}/music/files`). The template is simply passed to Pandoc. The
-`menu` section defines a global site menu, the formatting of which is largely
-tied to my template at the moment. The `pages` is the important part; it maps
-URLs to their source file(s).
+This is the configuration I'm using for [lumeh.org].
 
 ```python3
+from websleydale import build, copy, directory, menu, pandoc, set_defaults
+from websleydale.sources import Dir, Git
+
+local = Dir(".")
+pages = Dir("pages")
+recipes = Git("https://github.com/kalgynirae/recipes.git")
+rockuefort = Git("https://github.com/kalgynirae/rockuefort.git")
+routemaster = Git("https://github.com/routemaster/routemaster-frontend.git")
+subjunctive = Git("https://github.com/kalgynirae/subjunctive.git")
+think_green = Git("https://github.com/kalgynirae/thinking-green.git")
+websleydale_ = Git("https://github.com/kalgynirae/websleydale.git")
+
+root = directory({
+    "css": local["css"],
+    "font": local["font"],
+    "image": local["image"],
+    "robots.txt": pages["robots.txt"],
+    "index.html": pandoc(pages["index.pd"]),
+    "music.html": pandoc(pages["music.pd"]),
+    "boxer.html": pandoc(pages["boxer.pd"]),
+    "jabbrwockus.html": pandoc(pages["jabberwockus.pd"]),
+    "krypto.html": pandoc(pages["krypto.pd"], header=pages["krypto.header"]),
+    "cafe": directory({
+        "index.html": pages["cafe/index.html"],
+    }),
+    "recipes": directory({
+        "%s.html" % name: pandoc(recipes["%s.pd" % name]) for name in [
+            "chili",
+            "christmas_anything",
+            "cookies",
+            "creme_brulee_cheesecake",
+            "curry",
+            "krishna_dressing",
+            "mung_bean_dal",
+            "pumpkin_bread",
+            "sugar_cookies",
+            "sweet_potato_casserole",
+        ]
+    }),
+    "projects": directory({
+        "rockuefort/index.html": pandoc(rockuefort["README.md"]),
+        "routemaster/index.html": pandoc(routemaster["README.md"], toc=True),
+        "subjunctive/index.html": pandoc(subjunctive["README.md"]),
+        "think-green/index.html": pandoc(think_green["README.md"]),
+        "websleydale/index.html": pandoc(websleydale_["README.md"]),
+    }),
+    "wiki": directory({
+        "%s.html" % name: pandoc(pages["wiki/%s.pd" % name]) for name in [
+            "dragee",
+            "early-twenty-first-century",
+        ]
+    }),
+})
+
+menu_ = menu([
+    ("index", "/"),
+    ("music", "/music.html"),
+    ("projects", "/projects/"),
+    ("recipes", "/recipes/"),
+    ("wiki", "/wiki/"),
+    ("café", "/cafe/"),
+    ("chorus", "/chorus/"),
+    ("MUTAP", "/mutap/"),
+])
+
+#redirects = {
+#    "/games/narchanso.html": "/wiki/narchanso-ball.html",
+#    "/recipes/mung_bean_dahl.html": "/recipes/mung_bean_dal.html",
+#}
+
+set_defaults(
+    menu=menu_,
+    template=local["templates/lumeh.html"],
+)
+
+build("out", root)
 ```
 
 [pandoc]: http://www.johnmacfarlane.net/pandoc/
