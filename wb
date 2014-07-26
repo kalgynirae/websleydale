@@ -1,0 +1,30 @@
+#!/bin/bash
+
+SCRIPT_NAME=websleydalerc.py
+
+if [[ $# -ge 2 ]]; then
+    echo >&2 "usage: wb PROJECT_DIR"
+    exit 1
+fi
+
+# Snippet from http://stackoverflow.com/a/246128
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+WB_DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+# End snippet
+
+project_dir="$1"
+[[ -n $project_dir ]] || project_dir=.
+
+cd "$project_dir" || exit 2
+
+if [[ -r $SCRIPT_NAME ]]; then
+    PYTHONPATH="$WB_DIR" python3 $SCRIPT_NAME
+else
+    echo >&2 "No such file: $project_dir/$SCRIPT_NAME"
+    exit 3
+fi
