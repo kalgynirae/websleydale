@@ -11,10 +11,10 @@ class Dir:
         if not self.directory.is_dir():
             raise ValueError("not a directory: %s" % path)
 
-    @asyncio.coroutine
     def __getitem__(self, key):
-        yield from asyncio.sleep(0)
-        return self.directory / key
+        f = asyncio.Future()
+        f.set_result(self.directory / key)
+        return f
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__, str(self.directory))

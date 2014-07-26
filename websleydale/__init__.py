@@ -43,8 +43,8 @@ def directory(tree):
     path = util.temporary_dir()
     for destination, source_coro in tree.items():
         dest = path / destination
-        assert asyncio.iscoroutine(source_coro), log.format(
-                "{}: not a coroutine: {}", dest, source_coro)
+        #assert asyncio.iscoroutine(source_coro), log.format(
+        #        "{}: not a coroutine: {}", dest, source_coro)
         coros.append(copy(source_coro, dest))
     yield from _run(coros)
     return path
@@ -70,6 +70,11 @@ def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
 
     if asyncio.iscoroutine(header):
         header = yield from header
+    if asyncio.iscoroutine(footer):
+        footer = yield from footer
+    if asyncio.iscoroutine(css):
+        css = yield from css
+    template = yield from template
 
     args = [
         'pandoc',

@@ -33,7 +33,7 @@ compiling source files with [Pandoc].
 
 This is the configuration I'm using for [lumeh.org].
 
-```python3
+```python
 from websleydale import build, copy, directory, menu, pandoc, set_defaults
 from websleydale.sources import Dir, Git
 
