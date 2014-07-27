@@ -38,7 +38,8 @@ from websleydale import build, copy, directory, menu, pandoc, set_defaults
 from websleydale.sources import Dir, Git
 
 local = Dir(".")
-pages = Dir("pages")
+pages = Dir("pd")
+htaccess = Dir("htaccess")
 recipes = Git("https://github.com/kalgynirae/recipes.git")
 rockuefort = Git("https://github.com/kalgynirae/rockuefort.git")
 routemaster = Git("https://github.com/routemaster/routemaster-frontend.git")
@@ -47,17 +48,25 @@ think_green = Git("https://github.com/kalgynirae/thinking-green.git")
 websleydale_ = Git("https://github.com/kalgynirae/websleydale.git")
 
 root = directory({
+    ".htaccess": htaccess["root"],
+    "files/.htaccess": htaccess["files"],
+    "files/public/.htaccess": htaccess["files_public"],
+
     "css": local["css"],
     "font": local["font"],
     "image": local["image"],
+    "media": local["media"],
+    "favicon.ico": local["image/favicon.ico"],
+
     "robots.txt": pages["robots.txt"],
+    "404.shtml": pandoc(pages["404.pd"]),
     "index.html": pandoc(pages["index.pd"]),
     "music.html": pandoc(pages["music.pd"]),
     "boxer.html": pandoc(pages["boxer.pd"]),
-    "jabbrwockus.html": pandoc(pages["jabberwockus.pd"]),
+    "jabberwockus.html": pandoc(pages["jabberwockus.pd"]),
     "krypto.html": pandoc(pages["krypto.pd"], header=pages["krypto.header"]),
     "cafe": directory({
-        "index.html": pages["cafe/index.html"],
+        "index.html": pandoc(pages["cafe/index.pd"]),
     }),
     "recipes": directory({
         "%s.html" % name: pandoc(recipes["%s.pd" % name]) for name in [
@@ -84,6 +93,10 @@ root = directory({
         "%s.html" % name: pandoc(pages["wiki/%s.pd" % name]) for name in [
             "dragee",
             "early-twenty-first-century",
+            "the-caring-continuum",
+            "games/capture-the-flag",
+            "games/narchanso",
+            "games/the-base-game",
         ]
     }),
 })
@@ -95,14 +108,7 @@ menu_ = menu([
     ("recipes", "/recipes/"),
     ("wiki", "/wiki/"),
     ("café", "/cafe/"),
-    ("chorus", "/chorus/"),
-    ("MUTAP", "/mutap/"),
 ])
-
-#redirects = {
-#    "/games/narchanso.html": "/wiki/narchanso-ball.html",
-#    "/recipes/mung_bean_dahl.html": "/recipes/mung_bean_dal.html",
-#}
 
 set_defaults(
     menu=menu_,
