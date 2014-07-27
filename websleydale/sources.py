@@ -25,7 +25,7 @@ class Git:
     def __init__(self, clone_url, checkout=None, directory=None):
         self.checkout = checkout
         self.clone_url = clone_url
-        self.name = '/'.join(clone_url.split('/')[-2:]).rstrip('.git')
+        self.name = '/'.join(clone_url.split('/')[-2:])[:-len('.git')]
         if directory is None:
             t = temporary_dir(clone_url.split('/')[-1])
             self.directory = pathlib.Path(t)
