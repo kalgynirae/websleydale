@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 from . import log
 from .util import temporary_dir
 
+
 class Dir:
     def __init__(self, path='.'):
         self.directory = pathlib.Path(path)
@@ -13,16 +14,18 @@ class Dir:
 
     def __getitem__(self, key):
         f = asyncio.Future()
-        f.set_result(self.directory / key)
+        f.set_result(SourceFile(self.directory / key))
         return f
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__, str(self.directory))
 
+
 class Git:
     def __init__(self, clone_url, checkout=None, directory=None):
         self.checkout = checkout
         self.clone_url = clone_url
+        self.name = '/'.join(clone_url.split('/')[-2:]).rstrip('.git')
         if directory is None:
             t = temporary_dir(clone_url.split('/')[-1])
             self.directory = pathlib.Path(t)
@@ -42,7 +45,8 @@ class Git:
     @asyncio.coroutine
     def __getitem__(self, key):
         yield from self.clone_finished
-        return self.directory / key
+        info = self.generate_info(key)
+        return SourceFile(self.directory / key, info)
 
     def __repr__(self):
         return '{}({!r}, checkout={!r})'.format(self.__class__, self.clone_url,
@@ -76,13 +80,30 @@ class Git:
 
         # git log
         args = ['git', '-C', str(self.directory), 'log', '-n', '1',
-                '--pretty=format:%h']
+                '--pretty=format:%h %H']
         process = yield from asyncio.create_subprocess_exec(
                 *args, stderr=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE)
         output, _ = yield from process.communicate()
-        self.version = output.decode().strip()
-        log.info("Checked out {} from {}", self.version, self.clone_url)
+        self.shorthash, self.hash = output.decode().strip().split()
+        log.info("Checked out {} from {}", self.shorthash, self.clone_url)
+
+    def generate_info(self, key):
+        if self.host == 'GitHub':
+            url = 'https://github.com/{name}/blob/{hash}/{key}'
+        elif self.host == 'Bitbucket':
+            url = 'https://bitbucket.org/{name}/src/{hash}/{key}'
+        url = url.format(name=self.name, hash=self.hash, key=key)
+
+        info = '<a href="{url}">{name}</a> on {host}'
+        return info.format(host=self.host, url=url, name=self.name)
+
 
 class GitError(Exception):
     pass
+
+
+class SourceFile:
+    def __init__(self, path, info=None):
+        self.path = path
+        self.info = info

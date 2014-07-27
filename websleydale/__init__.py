@@ -27,14 +27,14 @@ def build(dest, root_coro):
 
 @asyncio.coroutine
 def copy(source_coro, dest):
-    source = yield from source_coro
+    source = (yield from source_coro).path
     log.debug("copy {} -> {}", source, dest)
     util.mkdir_if_needed(dest.parent)
     try:
         shutil.copy(str(source), str(dest))
     except IsADirectoryError:
         shutil.copytree(str(source), str(dest), copy_function=shutil.copy)
-    return dest
+    return sources.SourceFile(dest)
 
 
 @asyncio.coroutine
@@ -47,7 +47,7 @@ def directory(tree):
         #        "{}: not a coroutine: {}", dest, source_coro)
         coros.append(copy(source_coro, dest))
     yield from _run(coros)
-    return path
+    return sources.SourceFile(path)
 
 
 def menu(items):
@@ -65,16 +65,18 @@ def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
     if menu is None:
         menu = _defaults['menu']
 
-    in_path = yield from source_coro
+    source = yield from source_coro
+    in_path = source.path
     out_path = util.temporary_file('.html')
 
-    if asyncio.iscoroutine(header):
-        header = yield from header
-    if asyncio.iscoroutine(footer):
-        footer = yield from footer
-    if asyncio.iscoroutine(css):
-        css = yield from css
-    template = yield from template
+    if header:
+        header = (yield from header).path
+    if footer:
+        footer = (yield from footer).path
+    if css:
+        css = (yield from css).path
+    if template:
+        template = (yield from template).path
 
     args = [
         'pandoc',
@@ -91,12 +93,13 @@ def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
     if menu: args.append('--variable=menu:%s' % menu)
     if template: args.append('--template=%s' % template)
     if toc: args.append('--toc')
+    if source.info: args.append('--variable=source-info:%s' % source.info)
 
     log.debug("pandoc {}", args)
     process = yield from asyncio.create_subprocess_exec(*args)
     return_code = yield from process.wait()
 
-    return out_path
+    return sources.SourceFile(out_path)
 
 
 @asyncio.coroutine

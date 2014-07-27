@@ -3,7 +3,7 @@ import sys
 
 _color = True
 _log_file = sys.stderr
-_debug = True
+_debug = False
 _verbose = True
 
 def _c(test, color, bg_color=None, style=None, conv=str):
