@@ -112,8 +112,6 @@ set_defaults(
 build("out", root)
 ```
 
-[pandoc]: http://www.johnmacfarlane.net/pandoc/
-[pyyaml]: http://pyyaml.org/
-[docopt]: http://docopt.org/
+[Pandoc]: http://www.johnmacfarlane.net/pandoc/
 [pandoc-markdown]: http://www.johnmacfarlane.net/pandoc/README.html#pandocs-markdown
 [lumeh.org]: http://lumeh.org/
