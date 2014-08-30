@@ -3,31 +3,33 @@ compiling source files with [Pandoc].
 
 # Prerequisites
 
-*   [Pandoc] – installed and on your PATH so it can be run at the
-    command line by typing `pandoc`
+*   [Pandoc] – installed and on your PATH as `pandoc`
+
+# Installation
+
+Clone this git repository and put the `wb` script on your PATH somehow.
+For example, if you have `~/bin` in your PATH, you might do:
+
+    $ git clone <clone url> && cd websleydale
+    $ ln -s `pwd`/wb ~/bin/wb
 
 # Usage
 
-1.  Author your website pages in [Pandoc's markdown format][pandoc-markdown].
+1.  Author your website pages in [Pandoc's markdown format].
 
-2.  Write a `websleydale.py` script in the root of your project directory
-    that maps output filenames to their sources. See the sample below.
+2.  Make an HTML template file for Pandoc. You can use [Pandoc's default
+    HTML5 template] as a starting point. See the [Pandoc docs] for more
+    details.
 
-3.  Make a template file. Pandoc uses a template to convert your
-    Pandoc-markdown files to HTML. See the [Pandoc
-    docs](http://www.johnmacfarlane.net/pandoc/README.html#templates)
-    for more details. You can start with the [Pandoc's default HTML5
-    template](https://github.com/jgm/pandoc-templates/blob/master/default.html5).
+3.  Write a `websleydalerc.py` script in the root dir of your project.
+    See the sample below.
 
-4.  Run `wb` (Websleydale build):
+4.  Run `wb` (Websleydale build) from the root dir of your project.
 
-        $ wb path/to/project
+        $ wb
 
-    Websleydale will load the `websleydale.py` file from the directory
-    you specify.
-    (`.`) and that all output should go into the `build` directory.
-    Websleydale defaults to using the current directory as the source
-    directory but provides the `-s` flag to specify a different directory.
+    `wb` just executes the `websleydalerc.py` script with a little magic
+    to make sure the `websleydale` Python package is on the Python path.
 
 ## Sample websleydalerc.py file
 
@@ -119,5 +121,7 @@ build("out", root)
 ```
 
 [Pandoc]: http://www.johnmacfarlane.net/pandoc/
-[pandoc-markdown]: http://www.johnmacfarlane.net/pandoc/README.html#pandocs-markdown
+[Pandoc's markdown format]: http://www.johnmacfarlane.net/pandoc/README.html#pandocs-markdown
+[Pandoc's default HTML5 template]: https://github.com/jgm/pandoc-templates/blob/master/default.html5
+[Pandoc docs]: http://www.johnmacfarlane.net/pandoc/README.html#templates
 [lumeh.org]: http://lumeh.org/
