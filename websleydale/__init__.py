@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import collections
 import collections.abc
@@ -125,3 +126,16 @@ def _yesno(question, *args, default=False):
             return False
         elif "" == answer:
             return default
+
+if '--wb-invocation' in sys.argv:
+    # The wb script passes --wb when it executes a websleydalerc.py file.  This
+    # means we should parse command line arguments.
+    parser = argparse.ArgumentParser(prog='wb')
+    parser.add_argument('--no-color', action='store_false', dest='color',
+                        help="disable colorized output")
+    parser.add_argument('--verbose', action='store_true',
+                        help="print lots of messages")
+    parser.add_argument('--wb-invocation', action='store_true',
+                        help="used internally by the 'wb' script")
+    args = parser.parse_args()
+    log.configure(color=args.color, verbose=args.verbose)

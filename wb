@@ -1,11 +1,9 @@
 #!/bin/bash
+# The purpose of this wrapper script is (1) to determine the directory in which
+# the websleydale Python package lives and (2) to execute $SCRIPT_NAME with the
+# determined directory added to the Python path.
 
 SCRIPT_NAME=websleydalerc.py
-
-if [[ $# -ge 2 ]]; then
-    echo >&2 "usage: wb PROJECT_DIR"
-    exit 1
-fi
 
 # Snippet from http://stackoverflow.com/a/246128
 SOURCE="${BASH_SOURCE[0]}"
@@ -17,14 +15,9 @@ done
 WB_DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 # End snippet
 
-project_dir="$1"
-[[ -n $project_dir ]] || project_dir=.
-
-cd "$project_dir" || exit 2
-
-if [[ -r $SCRIPT_NAME ]]; then
-    PYTHONPATH="$WB_DIR" python3 $SCRIPT_NAME
+if [[ -a $SCRIPT_NAME ]]; then
+    PYTHONPATH="$WB_DIR" python3 $SCRIPT_NAME --wb-invocation "$@"
 else
-    echo >&2 "No such file: $project_dir/$SCRIPT_NAME"
-    exit 3
+    echo >&2 "$0: no $SCRIPT_NAME found in the current directory"
+    exit 1
 fi
