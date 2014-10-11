@@ -90,7 +90,7 @@ def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
     ]
     if css: args.append('--css=%s' % css)
     if footer: args.append('--include-after-body=%s' % footer)
-    if header: args.append('--include-before-body=%s' % header)
+    if header: args.append('--include-in-header=%s' % header)
     if menu: args.append('--variable=menu:%s' % menu)
     if template: args.append('--template=%s' % template)
     if toc: args.append('--toc')
