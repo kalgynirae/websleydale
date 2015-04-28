@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import collections
 import collections.abc
@@ -10,7 +9,7 @@ from . import log
 from . import sources
 from . import util
 
-__version__ = "2.0-alpha1"
+__version__ = '2.0-alpha1'
 
 _defaults = {}
 
@@ -18,7 +17,7 @@ _defaults = {}
 def build(dest, root_coro):
     dest = pathlib.Path(dest)
     if dest.exists():
-        if _yesno("Output directory {} exists.\nRemove it and continue?", dest):
+        if ask('Output directory {} exists.\nRemove it and continue?', dest):
             shutil.rmtree(str(dest))
         else:
             sys.exit(1)
@@ -29,7 +28,7 @@ def build(dest, root_coro):
 @asyncio.coroutine
 def copy(source_coro, dest):
     source = (yield from source_coro).path
-    log.debug("copy {} -> {}", source, dest)
+    log.debug('copy {} -> {}', source, dest)
     util.mkdir_if_needed(dest.parent)
     try:
         shutil.copy(str(source), str(dest))
@@ -45,7 +44,7 @@ def directory(tree):
     for destination, source_coro in tree.items():
         dest = path / destination
         #assert asyncio.iscoroutine(source_coro), log.format(
-        #        "{}: not a coroutine: {}", dest, source_coro)
+        #        '{}: not a coroutine: {}', dest, source_coro)
         coros.append(copy(source_coro, dest))
     yield from _run(coros)
     return sources.SourceFile(path)
@@ -96,7 +95,7 @@ def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
     if toc: args.append('--toc')
     if source.info: args.append('--variable=source-info:%s' % source.info)
 
-    log.debug("pandoc {}", args)
+    log.debug('pandoc {}', args)
     process = yield from asyncio.create_subprocess_exec(*args)
     return_code = yield from process.wait()
 
@@ -109,33 +108,20 @@ def _run(coros):
         try:
             result = yield from future
         except Exception as e:
-            log.warning("{}: {}", e.__class__.__name__, str(e))
+            log.warning('{}: {}', e.__class__.__name__, str(e))
 
 
 def set_defaults(**defaults):
     _defaults.update(defaults)
 
 
-def _yesno(question, *args, default=False):
-    choices = " (Y/n) " if default else " (y/N) "
+def ask(question, *args, default=False):
+    choices = ' (Y/n) ' if default else ' (y/N) '
     while True:
-        answer = input(">> " + log.format(question, *args) + choices)
-        if "y" == answer.lower():
+        answer = input('>> ' + log.format(question, *args) + choices)
+        if 'y' == answer.lower():
             return True
-        elif "n" == answer.lower():
+        elif 'n' == answer.lower():
             return False
-        elif "" == answer:
+        elif '' == answer:
             return default
-
-if '--wb-invocation' in sys.argv:
-    # The wb script passes --wb when it executes a websleydalerc.py file.  This
-    # means we should parse command line arguments.
-    parser = argparse.ArgumentParser(prog='wb')
-    parser.add_argument('--no-color', action='store_false', dest='color',
-                        help="disable colorized output")
-    parser.add_argument('--verbose', action='store_true',
-                        help="print lots of messages")
-    parser.add_argument('--wb-invocation', action='store_true',
-                        help="used internally by the 'wb' script")
-    args = parser.parse_args()
-    log.configure(color=args.color, verbose=args.verbose)

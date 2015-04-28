@@ -16,7 +16,7 @@ WB_DIR=$(cd -P "$(dirname "$SOURCE")" && pwd)
 # End snippet
 
 if [[ -a $SCRIPT_NAME ]]; then
-    PYTHONPATH=$WB_DIR python3 "$SCRIPT_NAME" --wb-invocation "$@"
+    PYTHONPATH=$WB_DIR python3 -m websleydale "$SCRIPT_NAME" "$@"
 else
     echo >&2 "$0: no $SCRIPT_NAME found in the current directory"
     exit 1
