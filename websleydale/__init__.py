@@ -9,7 +9,7 @@ from . import log
 from . import sources
 from . import util
 
-__version__ = '2.0-alpha1'
+__version__ = '2.0-alpha2'
 
 _defaults = {}
 
