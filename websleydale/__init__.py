@@ -1,6 +1,7 @@
 import asyncio
 import collections
 import collections.abc
+import contextlib
 import pathlib
 import shutil
 import sys
@@ -21,8 +22,8 @@ def build(dest, root_coro):
             shutil.rmtree(str(dest))
         else:
             sys.exit(1)
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(copy(root_coro, dest))
+    with contextlib.closing(asyncio.get_event_loop()) as loop:
+        loop.run_until_complete(copy(root_coro, dest))
 
 
 @asyncio.coroutine
