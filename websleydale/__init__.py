@@ -39,9 +39,21 @@ def copy(source_coro, dest):
 
 
 @asyncio.coroutine
-def directory(tree):
+def directory(tree, *, dirlist=None):
     coros = []
     path = util.temporary_dir()
+    if dirlist is not None:
+        tree = collections.ChainMap(tree, {
+            ".header.html": pandoc(
+                None,
+                template=_defaults["header_template"],
+                title=dirlist,
+            ),
+            ".footer.html": pandoc(
+                None,
+                template=_defaults["footer_template"],
+            ),
+        })
     for destination, source_coro in tree.items():
         dest = path / destination
         #assert asyncio.iscoroutine(source_coro), log.format(
@@ -60,13 +72,17 @@ def menu(items):
 
 @asyncio.coroutine
 def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
-           template=None, toc=False):
+           template=None, title=None, toc=False):
     if template is None:
         template = _defaults['template']
     if menu is None:
         menu = _defaults['menu']
 
-    source = yield from source_coro
+    if source_coro is None:
+        source = sources.SourceFile("/dev/null")
+    else:
+        source = yield from source_coro
+
     in_path = source.path
     out_path = util.temporary_file('.html')
 
@@ -93,6 +109,7 @@ def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
     if header: args.append('--include-in-header=%s' % header)
     if menu: args.append('--variable=menu:%s' % menu)
     if template: args.append('--template=%s' % template)
+    if title: args.append('--variable=pagetitle:%s' % title)
     if toc: args.append('--toc')
     if source.info: args.append('--variable=source-info:%s' % source.info)
 
