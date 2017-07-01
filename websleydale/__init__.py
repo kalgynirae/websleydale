@@ -2,9 +2,11 @@ import asyncio
 import collections
 import collections.abc
 import contextlib
+import logging
 import pathlib
 import shutil
 import sys
+import traceback
 
 from . import log
 from . import sources
@@ -26,9 +28,8 @@ def build(dest, root_coro):
         loop.run_until_complete(copy(root_coro, dest))
 
 
-@asyncio.coroutine
-def copy(source_coro, dest):
-    source = (yield from source_coro).path
+async def copy(source_coro, dest):
+    source = (await source_coro).path
     log.debug('copy {} -> {}', source, dest)
     util.mkdir_if_needed(dest.parent)
     try:
@@ -38,8 +39,7 @@ def copy(source_coro, dest):
     return sources.SourceFile(dest)
 
 
-@asyncio.coroutine
-def directory(tree, *, dirlist=None):
+async def directory(tree, *, dirlist=None):
     coros = []
     path = util.temporary_dir()
     if dirlist is not None:
@@ -59,7 +59,7 @@ def directory(tree, *, dirlist=None):
         #assert asyncio.iscoroutine(source_coro), log.format(
         #        '{}: not a coroutine: {}', dest, source_coro)
         coros.append(copy(source_coro, dest))
-    yield from _run(coros)
+    await _run(coros)
     return sources.SourceFile(path)
 
 
@@ -70,8 +70,7 @@ def menu(items):
     )
 
 
-@asyncio.coroutine
-def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
+async def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
            template=None, title=None, toc=False):
     if template is None:
         template = _defaults['template']
@@ -81,19 +80,19 @@ def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
     if source_coro is None:
         source = sources.SourceFile("/dev/null")
     else:
-        source = yield from source_coro
+        source = await source_coro
 
     in_path = source.path
     out_path = util.temporary_file('.html')
 
     if header:
-        header = (yield from header).path
+        header = (await header).path
     if footer:
-        footer = (yield from footer).path
+        footer = (await footer).path
     if css:
-        css = (yield from css).path
+        css = (await css).path
     if template:
-        template = (yield from template).path
+        template = (await template).path
 
     args = [
         'pandoc',
@@ -114,23 +113,28 @@ def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
     if source.info: args.append('--variable=source-info:%s' % source.info)
 
     log.debug('pandoc {}', args)
-    process = yield from asyncio.create_subprocess_exec(*args)
-    return_code = yield from process.wait()
+    process = await asyncio.create_subprocess_exec(*args)
+    return_code = await process.wait()
 
     return sources.SourceFile(out_path)
 
 
-@asyncio.coroutine
-def _run(coros):
+async def _run(coros):
     for future in asyncio.as_completed(coros):
         try:
-            result = yield from future
+            result = await future
         except Exception as e:
             log.warning('{}: {}', e.__class__.__name__, str(e))
+            traceback.print_exc()
 
 
 def set_defaults(**defaults):
-    _defaults.update(defaults)
+    # We need to be able to await these values multiple times; futures let us do that
+    futured = {
+        key: asyncio.ensure_future(value) if asyncio.iscoroutine(value) else value
+        for key, value in defaults.items()
+    }
+    _defaults.update(futured)
 
 
 def ask(question, *args, default=False):

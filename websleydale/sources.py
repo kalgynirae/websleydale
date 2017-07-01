@@ -1,3 +1,4 @@
+from abc import ABCMeta, abstractmethod
 import asyncio
 import pathlib
 from urllib.parse import urlsplit
@@ -12,10 +13,8 @@ class Dir:
         if not self.directory.is_dir():
             raise ValueError("not a directory: %s" % path)
 
-    def __getitem__(self, key):
-        f = asyncio.Future()
-        f.set_result(SourceFile(self.directory / key))
-        return f
+    async def __getitem__(self, key):
+        return SourceFile(self.directory / key)
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__, str(self.directory))
@@ -42,9 +41,8 @@ class Git:
         self.web_url = clone_url.rstrip('.git')
         self.clone_finished = asyncio.Task(self._clone())
 
-    @asyncio.coroutine
-    def __getitem__(self, key):
-        yield from self.clone_finished
+    async def __getitem__(self, key):
+        await self.clone_finished
         info = self.generate_info(key)
         return SourceFile(self.directory / key, info)
 
@@ -52,16 +50,15 @@ class Git:
         return '{}({!r}, checkout={!r})'.format(self.__class__, self.clone_url,
                                                 self.checkout)
 
-    @asyncio.coroutine
-    def _clone(self):
+    async def _clone(self):
         log.info("Cloning {}", self.clone_url)
 
         # git clone
         args = ['git', 'clone', '-q', self.clone_url, str(self.directory)]
-        process = yield from asyncio.create_subprocess_exec(
+        process = await asyncio.create_subprocess_exec(
                 *args, stderr=asyncio.subprocess.PIPE)
-        _, stderr = yield from process.communicate()
-        return_code = yield from process.wait()
+        _, stderr = await process.communicate()
+        return_code = await process.wait()
         if return_code != 0:
             print(stderr, file=sys.stderr)
             raise GitError("git clone returned %d" % return_code)
@@ -70,10 +67,10 @@ class Git:
         if self.checkout is not None:
             args = ['git', '-C', str(self.directory), 'checkout', '-q',
                     self.checkout]
-            process = yield from asyncio.create_subprocess_exec(
+            process = await asyncio.create_subprocess_exec(
                     *args, stderr=asyncio.subprocess.PIPE)
-            _, stderr = yield from process.communicate()
-            return_code = yield from process.wait()
+            _, stderr = await process.communicate()
+            return_code = await process.wait()
             if return_code != 0:
                 print(stderr, file=sys.stderr)
                 raise GitError("git checkout returned %d" % return_code)
@@ -81,10 +78,10 @@ class Git:
         # git log
         args = ['git', '-C', str(self.directory), 'log', '-n', '1',
                 '--pretty=format:%h %H']
-        process = yield from asyncio.create_subprocess_exec(
+        process = await asyncio.create_subprocess_exec(
                 *args, stderr=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE)
-        output, _ = yield from process.communicate()
+        output, _ = await process.communicate()
         self.shorthash, self.hash = output.decode().strip().split()
         log.info("Checked out {} from {}", self.shorthash, self.clone_url)
 
