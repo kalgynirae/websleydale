@@ -5,6 +5,7 @@ import contextlib
 import logging
 import pathlib
 import shutil
+import subprocess
 import sys
 import traceback
 
@@ -113,8 +114,13 @@ async def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
     if source.info: args.append('--variable=source-info:%s' % source.info)
 
     log.debug('pandoc {}', args)
-    process = await asyncio.create_subprocess_exec(*args)
-    return_code = await process.wait()
+    process = await asyncio.create_subprocess_exec(
+        *args,
+        stderr=subprocess.PIPE,
+    )
+    _, stderr = await process.communicate()
+    if stderr:
+        log.warning('pandoc stderr for input {}:\n{}', in_path, stderr.decode())
 
     return sources.SourceFile(out_path)
 
