@@ -53,6 +53,7 @@ async def directory(tree, *, dirlist=None):
             ".footer.html": pandoc(
                 None,
                 template=_defaults["footer_template"],
+                title='footer',
             ),
         })
     for destination, source_coro in tree.items():
