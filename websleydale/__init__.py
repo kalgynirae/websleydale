@@ -1,156 +1,90 @@
+#!/usr/bin/env python3
 import asyncio
-import collections
-import collections.abc
-import contextlib
-import logging
-import pathlib
 import shutil
-import subprocess
-import sys
-import traceback
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Awaitable
 
-from . import log
-from . import sources
-from . import util
+from . import log, util
 
-__version__ = '2.0-alpha2'
-
-_defaults = {}
+__all__ = ["build", "files", "markdown", "merge", "sass"]
+__version__ = "3.0-dev"
 
 
-def build(dest, root_coro):
-    dest = pathlib.Path(dest)
-    if dest.exists():
-        if ask('Output directory {} exists.\nRemove it and continue?', dest):
-            shutil.rmtree(str(dest))
+def build(root: Awaitable, *, dest: str) -> None:
+    destpath = Path(dest)
+    if destpath.exists():
+        shutil.rmtree(destpath)
+    asyncio.run(copy(root, destpath))
+
+
+@dataclass
+class File:
+    path: Path
+    source_path: Path
+
+
+class Processor:
+    dest_extension: ClassVar[str]
+
+    def __init__(self, source: File, dest: Path = None) -> None:
+        self.source = source
+        if dest is None:
+            self.dest = util.temporary_file(self.dest_extension)
         else:
-            sys.exit(1)
-    with contextlib.closing(asyncio.get_event_loop()) as loop:
-        loop.run_until_complete(copy(root_coro, dest))
+            self.dest = dest
+        self._processed = False
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.source})"
+
+    async def process(self) -> None:
+        if self._processed:
+            raise RuntimeError(r"Tried to process {self} more than once")
+        self._processed = True
 
 
-async def copy(source_coro, dest):
-    source = (await source_coro).path
-    log.debug('copy {} -> {}', source, dest)
-    util.mkdir_if_needed(dest.parent)
+async def copy(file: File, dest: Path) -> None:
+    dest.parent.mkdir(exist_ok=True, parents=True)
+    log.debug("copy {} -> {}", file, dest)
     try:
-        shutil.copy(str(source), str(dest))
+        shutil.copy(file.path, dest)
     except IsADirectoryError:
-        shutil.copytree(str(source), str(dest), copy_function=shutil.copy)
-    return sources.SourceFile(dest)
+        shutil.copytree(file.path, dest, copy_function=shutil.copy)
 
 
-async def directory(tree, *, dirlist=None):
-    coros = []
-    path = util.temporary_dir()
-    if dirlist is not None:
-        tree = collections.ChainMap(tree, {
-            ".header.html": pandoc(
-                None,
-                template=_defaults["header_template"],
-                title=dirlist,
-            ),
-            ".footer.html": pandoc(
-                None,
-                template=_defaults["footer_template"],
-                title='footer',
-            ),
-        })
-    for destination, source_coro in tree.items():
-        dest = path / destination
-        #assert asyncio.iscoroutine(source_coro), log.format(
-        #        '{}: not a coroutine: {}', dest, source_coro)
-        coros.append(copy(source_coro, dest))
-    await _run(coros)
-    return sources.SourceFile(path)
-
-
-def menu(items):
-    return '<!--\n-->'.join(
-        '<li><a href="{}">{}</a></li>'.format(href, name)
-        for name, href in items
-    )
-
-
-async def pandoc(source_coro, *, header=None, footer=None, css=None, menu=None,
-           template=None, title=None, toc=False):
-    if template is None:
-        template = _defaults['template']
-    if menu is None:
-        menu = _defaults['menu']
-
-    if source_coro is None:
-        source = sources.SourceFile("/dev/null")
-    else:
-        source = await source_coro
-
-    in_path = source.path
-    out_path = util.temporary_file('.html')
-
-    if header:
-        header = (await header).path
-    if footer:
-        footer = (await footer).path
-    if css:
-        css = (await css).path
-    if template:
-        template = (await template).path
-
+async def sass(file: File, dest: Path) -> None:
     args = [
-        'pandoc',
-        str(in_path),
-        '--output=%s' % out_path,
-        '--to=html5',
-        '--standalone',
-        '--preserve-tabs',
-        '--highlight-style=tango',
+        "pysassc",
+        str(file.path),
+        str(dest),
     ]
-    if css: args.append('--css=%s' % css)
-    if footer: args.append('--include-after-body=%s' % footer)
-    if header: args.append('--include-in-header=%s' % header)
-    if menu: args.append('--variable=menu:%s' % menu)
-    if template: args.append('--template=%s' % template)
-    if title: args.append('--variable=pagetitle:%s' % title)
-    if toc: args.append('--toc')
-    if source.info: args.append('--variable=source-info:%s' % source.info)
+    await _process_file(file, args)
 
-    log.debug('pandoc {}', args)
+
+async def _process_file(file: File, args: List[str]) -> None:
+    log.debug("[{}] Running command: {}", file, " ".join(quote(arg) for arg in args))
     process = await asyncio.create_subprocess_exec(
-        *args,
-        stderr=subprocess.PIPE,
+        *args, stderr=subprocess.PIPE, stdout=subprocess.PIPE,
     )
-    _, stderr = await process.communicate()
+    stdout, stderr = await process.communicate()
+    if stdout:
+        for line in stdout.decode(errors="replace").splitlines():
+            log.debug("[{}] stdout: {}", file, line)
     if stderr:
-        log.warning('pandoc stderr for input {}:\n{}', in_path, stderr.decode())
-
-    return sources.SourceFile(out_path)
-
-
-async def _run(coros):
-    for future in asyncio.as_completed(coros):
-        try:
-            result = await future
-        except Exception as e:
-            log.warning('{}: {}', e.__class__.__name__, str(e))
-            traceback.print_exc()
+        for line in stderr.decode(errors="replace").splitlines():
+            log.debug("[{}] stderr: {}", file, line)
+    log.debug("[{}] Command returned {}", file, process.returncode)
 
 
-def set_defaults(**defaults):
-    # We need to be able to await these values multiple times; futures let us do that
-    futured = {
-        key: asyncio.ensure_future(value) if asyncio.iscoroutine(value) else value
-        for key, value in defaults.items()
-    }
-    _defaults.update(futured)
+class Dir:
+    def __init__(self, path="."):
+        self.directory = pathlib.Path(path)
+        if not self.directory.is_dir():
+            raise ValueError("not a directory: %s" % path)
 
+    async def __getitem__(self, key):
+        return SourceFile(self.directory / key)
 
-def ask(question, *args, default=False):
-    choices = ' (Y/n) ' if default else ' (y/N) '
-    while True:
-        answer = input('>> ' + log.format(question, *args) + choices)
-        if 'y' == answer.lower():
-            return True
-        elif 'n' == answer.lower():
-            return False
-        elif '' == answer:
-            return default
+    def __repr__(self):
+        return "{}({!r})".format(self.__class__, str(self.directory))

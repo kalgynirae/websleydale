@@ -1,0 +1,3 @@
+[tool.black]
+target-version = ['py38']
+exclude = '/(\.git|\.mypy_cache|websleydalerc.py)/'

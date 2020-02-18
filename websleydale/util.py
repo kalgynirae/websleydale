@@ -4,13 +4,6 @@ import tempfile
 
 from . import log
 
-def mkdir_if_needed(path):
-    try:
-        path.mkdir(parents=True)
-        log.debug("Created directory {}", path)
-    except FileExistsError:
-        pass
-
 _tempdir = None
 def _make_tempdir():
     global _tempdir

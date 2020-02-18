@@ -1,14 +1,16 @@
+#!/usr/bin/env python3
 import argparse
+from pathlib import Path
 
 from . import log
 
-parser = argparse.ArgumentParser(prog='wb')
-parser.add_argument('rc_file', help=argparse.SUPPRESS)
-parser.add_argument('--verbose', action='store_true', help='print lots of messages')
+parser = argparse.ArgumentParser(prog="wb")
+parser.add_argument("project-dir", help=argparse.SUPPRESS, type=Path)
+parser.add_argument("--verbose", action="store_true", help="print lots of messages")
 args = parser.parse_args()
 log.configure(verbose=args.verbose)
 
-log.debug('exec({!r})', args.rc_file)
-with open(args.rc_file) as rc_file:
-    globals = {}
-    exec(rc_file.read(), globals)
+rcfile = args.project_dir / "websleydalerc.py"
+log.debug("exec({!r})", rcfile)
+with open(rcfile) as f:
+    exec(f.read(), {})
