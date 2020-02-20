@@ -6,6 +6,7 @@ import asyncio
 import logging
 import shutil
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
 from shlex import quote
 from subprocess import PIPE
@@ -41,10 +42,12 @@ def build(site: Site, *, dest: str) -> None:
         logger.debug("Removing dest directory %s", destdir)
         shutil.rmtree(destdir)
 
-    awaitables = [
-        producer.run(destdir / path, make_info(site, path))
-        for path, producer in site.tree.items()
-    ]
+    awaitables = []
+    for path, producer in site.tree.items():
+        if not isinstance(producer, FileProducer):
+            raise TypeError(f"item for path {path!r} has invalid type {type(producer)}")
+        awaitables.append(producer.run(destdir / path, make_info(site, Path(path))))
+
     results = asyncio.run(gather(awaitables))
     for result, path in zip(results, site.tree.keys()):
         if isinstance(result, Exception):
@@ -65,6 +68,7 @@ async def gather(
 class PageInfo:
     site: Dict[str, Any]
     page: Dict[str, Any]
+    time: datetime = datetime.now()
 
 
 def make_info(site: Site, path: Path) -> PageInfo:
@@ -76,19 +80,26 @@ class FileProducer:
         ...
 
 
-class sass(FileProducer):
+class file(FileProducer):
     def __init__(self, infile: Path) -> None:
         self.infile = infile
 
     async def run(self, dest: Path, info: PageInfo) -> Result:
         dest.parent.mkdir(exist_ok=True, parents=True)
-        args = [
-            "pysassc",
-            str(self.infile),
-            str(dest),
-        ]
-        await _process_file(self.infile, args)
+        logger.debug("[%s] Copying file", self.infile)
+        shutil.copy(self.infile, dest)
         return Result(self.infile)
+
+
+class directory(FileProducer):
+    def __init__(self, indir: Path) -> None:
+        self.indir = indir
+
+    async def run(self, dest: Path, info: PageInfo) -> Result:
+        dest.mkdir(exist_ok=True, parents=True)
+        logger.debug("[%s] Copying directory", self.indir)
+        shutil.copytree(self.indir, dest, copy_function=shutil.copy)
+        return Result(self.indir)
 
 
 class markdown(FileProducer):
@@ -117,6 +128,21 @@ class markdown(FileProducer):
         logger.debug("[%s] Writing to %s", self.infile, dest)
         dest.write_text(rendered)
 
+        return Result(self.infile)
+
+
+class sass(FileProducer):
+    def __init__(self, infile: Path) -> None:
+        self.infile = infile
+
+    async def run(self, dest: Path, info: PageInfo) -> Result:
+        dest.parent.mkdir(exist_ok=True, parents=True)
+        args = [
+            "pysassc",
+            str(self.infile),
+            str(dest),
+        ]
+        await _process_file(self.infile, args)
         return Result(self.infile)
 
 
