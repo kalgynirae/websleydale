@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>{{ page.title }} – {{ site.name }}</title>
   {% if page.description %}
-  <meta name="description" content="{{ page.description }}">
+  <meta name="description" content="{{ page.description | trim }}">
   {% endif %}
   <link rel="stylesheet" href="/css/test.css">
 </head>

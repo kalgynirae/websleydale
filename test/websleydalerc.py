@@ -1,7 +1,15 @@
-from websleydale import build, files, markdown, merge, sass
+from websleydale import Site, build, markdown, root, sass
 
-root = merge(
-    {"test.css": sass(files["styles/test.sass"])},
-    {file.path: markdown(file) for file in files["pages/**/*.md"]},
+site = Site(
+    name="Test Site",
+    tree={
+        "test.css": sass(root / "styles/test.sass"),
+        **{
+            path.relative_to(root / "pages").with_suffix(".html"): markdown(
+                path, template="page.html"
+            )
+            for path in root.glob("pages/**/*.md")
+        },
+    },
 )
-build(root, dest="out")
+build(site, dest="out")
