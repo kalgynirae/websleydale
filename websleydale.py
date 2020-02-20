@@ -96,7 +96,7 @@ class directory(FileProducer):
         self.indir = indir
 
     async def run(self, dest: Path, info: PageInfo) -> Result:
-        dest.mkdir(exist_ok=True, parents=True)
+        dest.parent.mkdir(exist_ok=True, parents=True)
         logger.debug("[%s] Copying directory", self.indir)
         shutil.copytree(self.indir, dest, copy_function=shutil.copy)
         return Result(self.indir)
