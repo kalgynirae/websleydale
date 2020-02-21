@@ -96,6 +96,8 @@ class directory(FileProducer):
         self.indir = indir
 
     async def run(self, dest: Path, info: PageInfo) -> Result:
+        if dest.suffix != "":
+            raise ValueError(f"Expected dest with no extension, got {dest!r}")
         dest.parent.mkdir(exist_ok=True, parents=True)
         logger.debug("[%s] Copying directory", self.indir)
         shutil.copytree(self.indir, dest, copy_function=shutil.copy)
@@ -108,6 +110,12 @@ class markdown(FileProducer):
         self.template = jinjaenv.get_template(template)
 
     async def run(self, dest: Path, info: PageInfo) -> Result:
+        if dest.suffix == ".html":
+            pass
+        elif dest.suffix == "":
+            dest = dest / "index.html"
+        else:
+            raise ValueError(f"Expected dest ending in '.html' or '', got {dest!r}")
         dest.parent.mkdir(exist_ok=True, parents=True)
 
         logger.debug("[%s] Reading source", self.infile)
@@ -136,6 +144,8 @@ class sass(FileProducer):
         self.infile = infile
 
     async def run(self, dest: Path, info: PageInfo) -> Result:
+        if dest.suffix != ".css":
+            raise ValueError(f"Expected dest ending in '.css', got {dest!r}")
         dest.parent.mkdir(exist_ok=True, parents=True)
         args = [
             "pysassc",
