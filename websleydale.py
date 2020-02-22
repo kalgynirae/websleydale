@@ -72,7 +72,7 @@ class PageInfo:
 
 
 def make_info(site: Site, path: Path) -> PageInfo:
-    return PageInfo(site={"name": site.name}, page={"path": path})
+    return PageInfo(site={"name": site.name}, page={"path": str(path)})
 
 
 class FileProducer:
