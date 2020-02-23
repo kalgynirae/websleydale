@@ -5,12 +5,13 @@ import argparse
 import asyncio
 import logging
 import shutil
+from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from shlex import quote
 from subprocess import PIPE
-from typing import Any, Awaitable, Dict, Iterable, List, Union
+from typing import Any, Awaitable, Dict, Iterable, List, Tuple, Union
 
 import jinja2
 import yaml
@@ -21,7 +22,10 @@ __version__ = "3.0-dev"
 
 logger = logging.getLogger(__name__)
 jinjaenv = jinja2.Environment(
-    loader=jinja2.FileSystemLoader("templates"), trim_blocks=True, lstrip_blocks=True
+    loader=jinja2.FileSystemLoader("templates"),
+    trim_blocks=True,
+    lstrip_blocks=True,
+    autoescape=True,
 )
 
 
@@ -33,6 +37,7 @@ class Result:
 @dataclass
 class Site:
     name: str
+    repo: str
     tree: Dict[Union[str, Path], FileProducer]
 
 
@@ -68,11 +73,17 @@ async def gather(
 class PageInfo:
     site: Dict[str, Any]
     page: Dict[str, Any]
-    time: datetime = datetime.now()
+    time: datetime
+    websleydale: Dict[str, Any]
 
 
 def make_info(site: Site, path: Path) -> PageInfo:
-    return PageInfo(site={"name": site.name}, page={"path": str(path)})
+    return PageInfo(
+        site={"name": site.name, "repo_base_url": site.repo},
+        page={"path": str(path)},
+        time=datetime.now(),
+        websleydale={"version": "websleydale"},
+    )
 
 
 class FileProducer:
@@ -104,6 +115,26 @@ class directory(FileProducer):
         return Result(self.indir)
 
 
+async def _git_authors(file: Path) -> List[str]:
+    stdout, stderr, exitcode = await _run(
+        ["git", "log", "--format=%an", "--", str(file)]
+    )
+    if stderr:
+        for line in stderr.decode(errors="replace").splitlines():
+            logger.debug("[%s] stderr: %s", file, line)
+    return list(Counter(stdout.decode(errors="replace").splitlines()).keys())
+
+
+async def _git_last_commit_date(file: Path) -> datetime:
+    stdout, stderr, exitcode = await _run(
+        ["git", "log", "-n1", "--format=%cI", "--", str(file)]
+    )
+    if stderr:
+        for line in stderr.decode(errors="replace").splitlines():
+            logger.debug("[%s] stderr: %s", file, line)
+    return datetime.fromisoformat(stdout.decode().rstrip())
+
+
 class markdown(FileProducer):
     def __init__(self, infile: Path, template: str) -> None:
         self.infile = infile
@@ -120,6 +151,15 @@ class markdown(FileProducer):
 
         logger.debug("[%s] Reading source", self.infile)
         text = self.infile.read_text()
+
+        logger.debug("[%s] Loading Git info", self.infile)
+        gitinfo = {
+            "authors": await _git_authors(self.infile),
+            "updated": await _git_last_commit_date(self.infile),
+        }
+        info.page.update(gitinfo)
+
+        info.page["source_path"] = str(self.infile)
 
         if text.startswith("---\n"):
             yamltext, text = text[4:].split("---\n", maxsplit=1)
@@ -158,15 +198,20 @@ class sass(FileProducer):
 
 async def _process_file(file: Path, args: List[str]) -> None:
     logger.debug("[%s] Running command: %s", file, " ".join(quote(arg) for arg in args))
-    process = await asyncio.create_subprocess_exec(*args, stderr=PIPE, stdout=PIPE)
-    stdout, stderr = await process.communicate()
+    stdout, stderr, exitcode = await _run(args)
     if stdout:
         for line in stdout.decode(errors="replace").splitlines():
             logger.debug("[%s] stdout: %s", file, line)
     if stderr:
         for line in stderr.decode(errors="replace").splitlines():
             logger.debug("[%s] stderr: %s", file, line)
-    logger.debug("[%s] Command returned %s", file, process.returncode)
+    logger.debug("[%s] Command returned %s", file, exitcode)
+
+
+async def _run(args: List[str]) -> Tuple[bytes, bytes, int]:
+    process = await asyncio.create_subprocess_exec(*args, stderr=PIPE, stdout=PIPE)
+    stdout, stderr = await process.communicate()
+    return stdout, stderr, process.returncode
 
 
 root = Path(".")
