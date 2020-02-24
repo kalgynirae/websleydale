@@ -11,7 +11,17 @@ from datetime import datetime
 from pathlib import Path
 from shlex import quote
 from subprocess import PIPE
-from typing import Any, Awaitable, Dict, Iterable, List, Tuple, Union
+from typing import (
+    Any,
+    Awaitable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    TypedDict,
+    Union,
+)
 
 import jinja2
 import yaml
@@ -37,8 +47,11 @@ class Result:
 @dataclass
 class Site:
     name: str
-    repo: str
-    tree: Dict[Union[str, Path], FileProducer]
+    repo_name: str
+    repo_url: str
+    tree: Dict[str, FileProducer]
+    generator: str = "websleydale"
+    time: datetime = datetime.now()
 
 
 def build(site: Site, *, dest: str) -> None:
@@ -48,10 +61,14 @@ def build(site: Site, *, dest: str) -> None:
         shutil.rmtree(destdir)
 
     awaitables = []
-    for path, producer in site.tree.items():
+    for pathstr, producer in site.tree.items():
+        if not pathstr.startswith("/"):
+            raise ValueError(f"Invalid path {pathstr!r} (doesn't start with '/')")
         if not isinstance(producer, FileProducer):
-            raise TypeError(f"item for path {path!r} has invalid type {type(producer)}")
-        awaitables.append(producer.run(destdir / path, make_info(site, Path(path))))
+            raise TypeError(
+                f"item for path {pathstr!r} has invalid type {type(producer)}"
+            )
+        awaitables.append(producer.run(destdir, pathstr, site))
 
     results = asyncio.run(gather(awaitables))
     for result, path in zip(results, site.tree.keys()):
@@ -69,25 +86,8 @@ async def gather(
     return await asyncio.gather(*awaitables, return_exceptions=True)
 
 
-@dataclass
-class PageInfo:
-    site: Dict[str, Any]
-    page: Dict[str, Any]
-    time: datetime
-    websleydale: Dict[str, Any]
-
-
-def make_info(site: Site, path: Path) -> PageInfo:
-    return PageInfo(
-        site={"name": site.name, "repo_base_url": site.repo},
-        page={"path": str(path)},
-        time=datetime.now(),
-        websleydale={"version": "websleydale"},
-    )
-
-
 class FileProducer:
-    async def run(self, dest: Path, info: PageInfo) -> Result:
+    async def run(self, destdir: Path, path: str, site: Site) -> Result:
         ...
 
 
@@ -95,7 +95,8 @@ class file(FileProducer):
     def __init__(self, infile: Path) -> None:
         self.infile = infile
 
-    async def run(self, dest: Path, info: PageInfo) -> Result:
+    async def run(self, destdir: Path, path: str, site: Site) -> Result:
+        dest = destdir / path.lstrip("/")
         dest.parent.mkdir(exist_ok=True, parents=True)
         logger.debug("[%s] Copying file", self.infile)
         shutil.copy(self.infile, dest)
@@ -106,7 +107,8 @@ class directory(FileProducer):
     def __init__(self, indir: Path) -> None:
         self.indir = indir
 
-    async def run(self, dest: Path, info: PageInfo) -> Result:
+    async def run(self, destdir: Path, path: str, site: Site) -> Result:
+        dest = destdir / path.lstrip("/")
         if dest.suffix != "":
             raise ValueError(f"Expected dest with no extension, got {dest!r}")
         dest.parent.mkdir(exist_ok=True, parents=True)
@@ -125,14 +127,18 @@ async def _git_authors(file: Path) -> List[str]:
     return list(Counter(stdout.decode(errors="replace").splitlines()).keys())
 
 
-async def _git_last_commit_date(file: Path) -> datetime:
+async def _git_last_commit_date(file: Path) -> Optional[datetime]:
     stdout, stderr, exitcode = await _run(
         ["git", "log", "-n1", "--format=%cI", "--", str(file)]
     )
     if stderr:
         for line in stderr.decode(errors="replace").splitlines():
             logger.debug("[%s] stderr: %s", file, line)
-    return datetime.fromisoformat(stdout.decode().rstrip())
+    datestr = stdout.decode().rstrip()
+    try:
+        return datetime.fromisoformat(datestr)
+    except ValueError:
+        return None
 
 
 class markdown(FileProducer):
@@ -140,38 +146,39 @@ class markdown(FileProducer):
         self.infile = infile
         self.template = jinjaenv.get_template(template)
 
-    async def run(self, dest: Path, info: PageInfo) -> Result:
-        if dest.suffix == ".html":
+    async def run(self, destdir: Path, path: str, site: Site) -> Result:
+        if path.endswith("/"):
+            path += "index.html"
+        elif path.endswith(".html"):
             pass
-        elif dest.suffix == "":
-            dest = dest / "index.html"
         else:
-            raise ValueError(f"Expected dest ending in '.html' or '', got {dest!r}")
+            raise ValueError(f"Expected dest ending in '/' or '.html', got {path!r}")
+
+        dest = destdir / path.lstrip("/")
         dest.parent.mkdir(exist_ok=True, parents=True)
 
         logger.debug("[%s] Reading source", self.infile)
         text = self.infile.read_text()
 
         logger.debug("[%s] Loading Git info", self.infile)
-        gitinfo = {
+        pageinfo = {
             "authors": await _git_authors(self.infile),
+            "path": path,
+            "source_path": str(self.infile),
             "updated": await _git_last_commit_date(self.infile),
         }
-        info.page.update(gitinfo)
-
-        info.page["source_path"] = str(self.infile)
 
         if text.startswith("---\n"):
             yamltext, text = text[4:].split("---\n", maxsplit=1)
             yamlinfo = yaml.safe_load(yamltext)
-            info.page.update(yamlinfo)
+            pageinfo.update(yamlinfo)
 
         logger.debug("[%s] Rendering content", self.infile)
         with HTMLRenderer() as renderer:
-            info.page["content"] = renderer.render(Document(text))
+            pageinfo["content"] = renderer.render(Document(text))
 
         logger.debug("[%s] Rendering template", self.infile)
-        rendered = self.template.render(**asdict(info))
+        rendered = self.template.render(page=pageinfo, site=site)
 
         logger.debug("[%s] Writing to %s", self.infile, dest)
         dest.write_text(rendered)
@@ -183,7 +190,8 @@ class sass(FileProducer):
     def __init__(self, infile: Path) -> None:
         self.infile = infile
 
-    async def run(self, dest: Path, info: PageInfo) -> Result:
+    async def run(self, destdir: Path, path: str, site: Site) -> Result:
+        dest = destdir / path.lstrip("/")
         if dest.suffix != ".css":
             raise ValueError(f"Expected dest ending in '.css', got {dest!r}")
         dest.parent.mkdir(exist_ok=True, parents=True)
