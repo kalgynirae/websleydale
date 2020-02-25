@@ -18,6 +18,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Set,
     Tuple,
     TypedDict,
     Union,
@@ -25,7 +26,6 @@ from typing import (
 
 import jinja2
 import yaml
-
 from mistletoe import Document, HTMLRenderer
 
 __version__ = "3.0-dev"
@@ -46,6 +46,7 @@ class Result:
 
 @dataclass
 class Site:
+    known_authors: Set[Author]
     name: str
     repo_name: str
     repo_url: str
@@ -117,28 +118,72 @@ class directory(FileProducer):
         return Result(self.indir)
 
 
-async def _git_authors(file: Path) -> List[str]:
+@dataclass(frozen=True)
+class Author:
+    display_name: str
+    email: str
+    url: Optional[str]
+
+
+@dataclass
+class GitFileInfo:
+    authors: List[Author]
+    repo_source_path: str
+    repo_url: Optional[str]
+    updated_date: datetime
+
+
+async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
     stdout, stderr, exitcode = await _run(
-        ["git", "log", "--format=%an", "--", str(file)]
+        [
+            "bash",
+            "-c",
+            "--",
+            f"cd {quote(str(file.parent))} && git ls-files --full-name {quote(str(file.name))} && git remote -v",
+        ]
     )
     if stderr:
         for line in stderr.decode(errors="replace").splitlines():
             logger.debug("[%s] stderr: %s", file, line)
-    return list(Counter(stdout.decode(errors="replace").splitlines()).keys())
+    lines = iter(stdout.decode(errors="replace").splitlines())
+    repo_source_path = next(lines)
+    repo_url = None
+    for line in lines:
+        remote_name, remote_url, _ = line.split(maxsplit=2)
+        if remote_name == "origin":
+            repo_url = remote_url
+            break
+    if repo_url is not None:
+        if repo_url.endswith(".git"):
+            repo_url = repo_url[:-len(".git")]
+        if repo_url.startswith("git@github.com:"):
+            repo_name = repo_url[len("git@github.com:"):]
+            repo_url = f"https://github.com/{repo_name}"
 
-
-async def _git_last_commit_date(file: Path) -> Optional[datetime]:
     stdout, stderr, exitcode = await _run(
-        ["git", "log", "-n1", "--format=%cI", "--", str(file)]
+        ["git", "log", "--format=%cI %ae %an", "--", str(file)]
     )
     if stderr:
         for line in stderr.decode(errors="replace").splitlines():
             logger.debug("[%s] stderr: %s", file, line)
-    datestr = stdout.decode().rstrip()
-    try:
-        return datetime.fromisoformat(datestr)
-    except ValueError:
-        return None
+
+    date = None
+    for line in stdout.decode(errors="replace").splitlines():
+        datestr, email, name = line.split(maxsplit=2)
+        if date is None:
+            date = datetime.fromisoformat(datestr)
+        authors: Dict[Author, None] = {}
+        author = next((a for a in site.known_authors if a.email == email), None)
+        if author is None:
+            author = Author(display_name=name, email=email, url=None)
+        authors[author] = None
+    assert date is not None
+    return GitFileInfo(
+        authors=list(authors.keys()),
+        repo_source_path=repo_source_path,
+        repo_url=repo_url,
+        updated_date=date,
+    )
 
 
 class markdown(FileProducer):
@@ -161,11 +206,14 @@ class markdown(FileProducer):
         text = self.infile.read_text()
 
         logger.debug("[%s] Loading Git info", self.infile)
+        gitinfo = await _git_file_info(self.infile, site)
         pageinfo = {
-            "authors": await _git_authors(self.infile),
+            "authors": gitinfo.authors,
             "path": path,
+            "repo_url": gitinfo.repo_url,
+            "repo_source_path": gitinfo.repo_source_path,
             "source_path": str(self.infile),
-            "updated": await _git_last_commit_date(self.infile),
+            "updated_date": gitinfo.updated_date,
         }
 
         if text.startswith("---\n"):
@@ -195,11 +243,7 @@ class sass(FileProducer):
         if dest.suffix != ".css":
             raise ValueError(f"Expected dest ending in '.css', got {dest!r}")
         dest.parent.mkdir(exist_ok=True, parents=True)
-        args = [
-            "pysassc",
-            str(self.infile),
-            str(dest),
-        ]
+        args = ["pysassc", str(self.infile), str(dest)]
         await _process_file(self.infile, args)
         return Result(self.infile)
 
