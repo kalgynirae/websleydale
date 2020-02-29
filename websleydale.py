@@ -123,6 +123,13 @@ async def copy(dest: Path, source_producer: FileProducer, info: Info) -> None:
         dest.parent.mkdir(exist_ok=True, parents=True)
         shutil.copy(source.path, dest)
 
+        if source.sourceinfo is not None:
+            mtime = source.sourceinfo.updated_date.timestamp()
+            os.utime(dest, (mtime, mtime))
+
+            if dest.name == "index.html":
+                os.utime(dest.parent, (mtime, mtime))
+
 
 async def gather(awaitables: Iterable[Awaitable[None]],) -> List[Optional[Exception]]:
     return cast(
