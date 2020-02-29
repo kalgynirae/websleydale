@@ -331,7 +331,7 @@ class sass(FileProducer):
     async def run(self, info: Info) -> FileResult:
         source = await self.source.run(info)
         dest = outfile()
-        args = ["pysassc", str(source.path), str(dest)]
+        args = ["pysassc", "--style", "compressed", str(source.path), str(dest)]
         proc = await asyncio.create_subprocess_exec(*args)
         exitcode = await proc.wait()
         if exitcode != 0:
