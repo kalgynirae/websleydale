@@ -29,6 +29,7 @@ from typing import (
 
 import jinja2
 import yaml
+
 from mistletoe import Document, HTMLRenderer
 
 __version__ = "3.0-dev"
@@ -290,15 +291,12 @@ class markdown(TextProducer):
 
 
 class fake(TextProducer):
-    def __init__(self, pageinfo: Dict[str, Any]) -> None:
-        self.pageinfo = pageinfo
+    def __init__(self, pageinfo: Optional[Dict[str, Any]] = None) -> None:
+        self.pageinfo = pageinfo if pageinfo is not None else {}
 
     async def run(self, info: Info) -> TextResult:
         sourceinfo = SourceInfo(
-            authors = [],
-            repo_source_path = "",
-            repo_url = None,
-            updated_date = datetime.now(),
+            authors=[], repo_source_path="", repo_url=None, updated_date=datetime.now(),
         )
         return TextResult(sourceinfo=sourceinfo, content="", pageinfo=self.pageinfo)
 
