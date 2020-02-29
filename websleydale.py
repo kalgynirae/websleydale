@@ -23,8 +23,8 @@ from typing import (
     Optional,
     Set,
     Tuple,
-    TypedDict,
     Union,
+    cast,
 )
 
 import jinja2
@@ -87,15 +87,15 @@ def build(site: Site, *, dest: str) -> None:
     awaitables = []
     paths = []
     for pathstr, producer in site.tree.items():
-        if not pathstr.startswith("/"):
-            raise ValueError(f"Invalid path {pathstr!r} (doesn't start with '/')")
+        if pathstr.startswith("/"):
+            raise ValueError(f"Invalid path {pathstr!r} (starts with '/')")
         if not isinstance(producer, FileProducer):
             raise TypeError(
                 f"item for path {pathstr!r} has invalid type {type(producer)}"
             )
-        dest = destdir / pathstr.lstrip("/")
+        destpath = destdir / pathstr
         info = Info(path=pathstr, site=site)
-        awaitables.append(copy(dest, producer, info))
+        awaitables.append(copy(destpath, producer, info))
         paths.append(pathstr)
 
     results = asyncio.run(gather(awaitables))
@@ -110,8 +110,8 @@ def build(site: Site, *, dest: str) -> None:
             logger.error("[%s] got unexpected result %r", path, result)
 
 
-async def copy(dest: Path, source: FileProducer, info: Info) -> None:
-    source = await source.run(info)
+async def copy(dest: Path, source_producer: FileProducer, info: Info) -> None:
+    source = await source_producer.run(info)
     if source.path.is_dir():
         logger.debug("Copying directory %s -> %s", source.path, dest)
         dest.parent.mkdir(exist_ok=True, parents=True)
@@ -124,15 +124,16 @@ async def copy(dest: Path, source: FileProducer, info: Info) -> None:
         shutil.copy(source.path, dest)
 
 
-async def gather(
-    awaitables: Iterable[Awaitable[Result]],
-) -> List[Union[Result, Exception]]:
-    return await asyncio.gather(*awaitables, return_exceptions=True)
+async def gather(awaitables: Iterable[Awaitable[None]],) -> List[Optional[Exception]]:
+    return cast(
+        List[Optional[Exception]],
+        await asyncio.gather(*awaitables, return_exceptions=True),
+    )
 
 
 @dataclass
 class Result:
-    sourceinfo: SourceInfo
+    sourceinfo: Optional[SourceInfo]
 
 
 @dataclass
@@ -143,6 +144,7 @@ class FileResult(Result):
 @dataclass
 class TextResult(Result):
     content: str
+    pageinfo: Dict[str, Any]
 
 
 class FileProducer:
@@ -152,14 +154,6 @@ class FileProducer:
 
 class TextProducer:
     async def run(self, info: Info) -> TextResult:
-        ...
-
-
-class index(FileProducer):
-    def __init__(self, template: str) -> None:
-        self.template = jinjaenv.get_template(template)
-
-    async def run(self, destdir: Path, path: str, site: Site) -> Result:
         ...
 
 
@@ -181,9 +175,8 @@ class GitFileInfo:
 @dataclass
 class SourceInfo:
     authors: List[Author]
-    repo_source_path: Path
-    repo_url: str
-    source_path: Path
+    repo_source_path: str
+    repo_url: Optional[str]
     updated_date: datetime
 
 
@@ -200,7 +193,6 @@ class file(FileProducer):
             authors=gitinfo.authors,
             repo_source_path=gitinfo.repo_source_path,
             repo_url=gitinfo.repo_url,
-            source_path=self.path,
             updated_date=gitinfo.updated_date,
         )
         return FileResult(sourceinfo=sourceinfo, path=self.path)
@@ -269,24 +261,53 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
     )
 
 
-class markdown(FileProducer):
-    def __init__(self, path: Path, template: str) -> None:
+class markdown(TextProducer):
+    def __init__(self, path: Path) -> None:
         self.source = file(path)
-        self.template = jinjaenv.get_template(template)
 
-    async def run(self, info: Info) -> FileResult:
+    async def run(self, info: Info) -> TextResult:
         source = await self.source.run(info)
-        dest = outfile()
         content = source.path.read_text()
 
-        pageinfo = {}
+        pageinfo: Dict[str, Any] = {}
         if content.startswith("---\n"):
             yamltext, content = content[4:].split("---\n", maxsplit=1)
             pageinfo.update(yaml.safe_load(yamltext))
 
         with HTMLRenderer() as renderer:
-            pageinfo["content"] = renderer.render(Document(content))
+            rendered = renderer.render(Document(content))
 
+        return TextResult(
+            sourceinfo=source.sourceinfo, content=rendered, pageinfo=pageinfo
+        )
+
+
+class fake(TextProducer):
+    def __init__(self, pageinfo: Dict[str, Any]) -> None:
+        self.pageinfo = pageinfo
+
+    async def run(self, info: Info) -> TextResult:
+        sourceinfo = SourceInfo(
+            authors = [],
+            repo_source_path = "",
+            repo_url = None,
+            updated_date = datetime.now(),
+        )
+        return TextResult(sourceinfo=sourceinfo, content="", pageinfo=self.pageinfo)
+
+
+class jinja(FileProducer):
+    def __init__(self, source: TextProducer, template: str) -> None:
+        self.source = source
+        self.template = jinjaenv.get_template(template)
+
+    async def run(self, info: Info) -> FileResult:
+        source = await self.source.run(info)
+        content = source.content
+        pageinfo = source.pageinfo
+        dest = outfile()
+
+        pageinfo["content"] = content
         pageinfo["path"] = info.path
         rendered = self.template.render(
             page=pageinfo, site=info.site, source=source.sourceinfo
@@ -317,8 +338,11 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action="store_true", help="print lots of messages")
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO, format="%(message)s"
+    )
+    logging.getLogger("asyncio").setLevel(logging.INFO)
 
-    logger.debug("exec(%r)", args.rcfile)
+    logger.debug("Loading %r", args.rcfile)
     with open(args.rcfile) as f:
         exec(f.read(), {})
