@@ -236,7 +236,7 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
             repo_name = repo_url[len("git@github.com:") :]
             repo_url = f"https://github.com/{repo_name}"
 
-    args = ["git", "log", "--format=%cI %ae %an", "--", str(file)]
+    args = ["bash", "-c", "--", f"cd {quote(str(file.parent))} && git log --format='%cI %ae %an' -- {quote(str(file.name))}"]
     proc = await asyncio.create_subprocess_exec(*args, stdout=PIPE)
     stdout, _ = await proc.communicate()
     if proc.returncode != 0:
