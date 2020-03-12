@@ -6,7 +6,6 @@ import asyncio
 import logging
 import os
 import shutil
-from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from itertools import chain
@@ -17,6 +16,7 @@ from tempfile import mkdtemp, mkstemp
 from typing import (
     Any,
     Awaitable,
+    Counter,
     Dict,
     Iterable,
     List,
@@ -29,8 +29,9 @@ from typing import (
 
 import jinja2
 import yaml
-
 from mistletoe import Document, HTMLRenderer
+from mistletoe.block_token import Heading
+from slugify import slugify
 
 __version__ = "3.0-dev"
 
@@ -236,7 +237,12 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
             repo_name = repo_url[len("git@github.com:") :]
             repo_url = f"https://github.com/{repo_name}"
 
-    args = ["bash", "-c", "--", f"cd {quote(str(file.parent))} && git log --format='%cI %ae %an' -- {quote(str(file.name))}"]
+    args = [
+        "bash",
+        "-c",
+        "--",
+        f"cd {quote(str(file.parent))} && git log --format='%cI %ae %an' -- {quote(str(file.name))}",
+    ]
     proc = await asyncio.create_subprocess_exec(*args, stdout=PIPE)
     stdout, _ = await proc.communicate()
     if proc.returncode != 0:
@@ -275,7 +281,7 @@ class markdown(TextProducer):
             yamltext, content = content[4:].split("---\n", maxsplit=1)
             pageinfo.update(yaml.safe_load(yamltext))
 
-        with HTMLRenderer() as renderer:
+        with WebsleydaleHTMLRenderer() as renderer:
             rendered = renderer.render(Document(content))
 
         return TextResult(
@@ -289,7 +295,7 @@ class fake(TextProducer):
 
     async def run(self, info: Info) -> TextResult:
         sourceinfo = SourceInfo(
-            authors=[], repo_source_path="", repo_url=None, updated_date=datetime.now(),
+            authors=[], repo_source_path="", repo_url=None, updated_date=datetime.now()
         )
         return TextResult(sourceinfo=sourceinfo, content="", pageinfo=self.pageinfo)
 
@@ -328,6 +334,38 @@ class sass(FileProducer):
         if exitcode != 0:
             raise RuntimeError("pysassc failed")
         return FileResult(sourceinfo=source.sourceinfo, path=dest)
+
+
+class IdGenerator:
+    def __init__(self) -> None:
+        self.used_ids: Counter[str] = Counter()
+
+    def get_id(self, text: str) -> str:
+        id_base = slugify(text,
+            entities=False,
+            decimal=False,
+            hexadecimal=False,
+            )
+        if id_base in self.used_ids:
+            real_id = f"{id_base}-{self.used_ids[id_base]}"
+        else:
+            real_id = id_base
+        self.used_ids[id_base] += 1
+        return real_id
+
+
+class WebsleydaleHTMLRenderer(HTMLRenderer):
+    def __init__(self) -> None:
+        super().__init__()
+        self.ids = IdGenerator()
+
+    def render_heading(self, token: Heading) -> str:
+        level = token.level
+        inner = self.render_inner(token)
+        identifier = self.ids.get_id(
+            self.render_to_plain(token),
+        )
+        return f'<a class=anchor href="#{identifier}"><h{level} id="{identifier}">{inner}</h{level}></a>'
 
 
 if __name__ == "__main__":

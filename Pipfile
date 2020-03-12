@@ -13,6 +13,7 @@ mistletoe = "*"
 libsass = "*"
 jinja2 = "*"
 pyyaml = "*"
+python-slugify = "*"
 
 [requires]
 python_version = "3.8"
