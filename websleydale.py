@@ -169,15 +169,16 @@ class Author:
 @dataclass
 class GitFileInfo:
     authors: List[Author]
-    repo_source_path: str
+    repo_source_path: Optional[str]
     repo_url: Optional[str]
-    updated_date: datetime
+    updated_date: Optional[datetime]
 
 
 @dataclass
 class SourceInfo:
     authors: List[Author]
-    repo_source_path: str
+    is_committed: bool
+    repo_source_path: Optional[str]
     repo_url: Optional[str]
     updated_date: datetime
 
@@ -193,9 +194,10 @@ class file(FileProducer):
         gitinfo = await _git_file_info(self.path, info.site)
         sourceinfo = SourceInfo(
             authors=gitinfo.authors,
+            is_committed=gitinfo.updated_date is not None,
             repo_source_path=gitinfo.repo_source_path,
             repo_url=gitinfo.repo_url,
-            updated_date=gitinfo.updated_date,
+            updated_date=gitinfo.updated_date or datetime.now(),
         )
         return FileResult(sourceinfo=sourceinfo, path=self.path)
 
@@ -214,18 +216,24 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
     args = [
         "bash",
         "-c",
-        "--",
-        f"cd {quote(str(file.parent))} && git ls-files --full-name {quote(str(file.name))} && git remote -v",
+        f"cd {quote(str(file.parent))} && git ls-files --full-name {quote(str(file.name))}",
     ]
     proc = await asyncio.create_subprocess_exec(*args, stdout=PIPE)
     stdout, _ = await proc.communicate()
     if proc.returncode != 0:
         raise RuntimeError("git failed")
 
-    lines = iter(stdout.decode(errors="replace").splitlines())
-    repo_source_path = next(lines)
+    lines = stdout.decode(errors="replace").splitlines()
+    repo_source_path = lines[0] if lines else None
+
+    args = ["bash", "-c", f"cd {quote(str(file.parent))} && git remote -v"]
+    proc = await asyncio.create_subprocess_exec(*args, stdout=PIPE)
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError("git failed")
+
     repo_url = None
-    for line in lines:
+    for line in stdout.decode(errors="replace").splitlines():
         remote_name, remote_url, _ = line.split(maxsplit=2)
         if remote_name == "origin":
             repo_url = remote_url
@@ -240,7 +248,6 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
     args = [
         "bash",
         "-c",
-        "--",
         f"cd {quote(str(file.parent))} && git log --format='%cI %ae %an' -- {quote(str(file.name))}",
     ]
     proc = await asyncio.create_subprocess_exec(*args, stdout=PIPE)
@@ -248,17 +255,16 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
     if proc.returncode != 0:
         raise RuntimeError("git failed")
 
+    authors: Dict[Author, None] = {}
     date = None
     for line in stdout.decode(errors="replace").splitlines():
         datestr, email, name = line.split(maxsplit=2)
         if date is None:
             date = datetime.fromisoformat(datestr)
-        authors: Dict[Author, None] = {}
         author = next((a for a in site.known_authors if a.email == email), None)
         if author is None:
             author = Author(display_name=name, email=email, url=None)
         authors[author] = None
-    assert date is not None
 
     return GitFileInfo(
         authors=list(authors.keys()),
@@ -295,7 +301,11 @@ class fake(TextProducer):
 
     async def run(self, info: Info) -> TextResult:
         sourceinfo = SourceInfo(
-            authors=[], repo_source_path="", repo_url=None, updated_date=datetime.now()
+            authors=[],
+            is_committed=False,
+            repo_source_path="",
+            repo_url=None,
+            updated_date=datetime.now(),
         )
         return TextResult(sourceinfo=sourceinfo, content="", pageinfo=self.pageinfo)
 
@@ -341,11 +351,7 @@ class IdGenerator:
         self.used_ids: Counter[str] = Counter()
 
     def get_id(self, text: str) -> str:
-        id_base = slugify(text,
-            entities=False,
-            decimal=False,
-            hexadecimal=False,
-            )
+        id_base = slugify(text, entities=False, decimal=False, hexadecimal=False)
         if id_base in self.used_ids:
             real_id = f"{id_base}-{self.used_ids[id_base]}"
         else:
@@ -362,9 +368,7 @@ class WebsleydaleHTMLRenderer(HTMLRenderer):
     def render_heading(self, token: Heading) -> str:
         level = token.level
         inner = self.render_inner(token)
-        identifier = self.ids.get_id(
-            self.render_to_plain(token),
-        )
+        identifier = self.ids.get_id(self.render_to_plain(token))
         return f'<a class=anchor href="#{identifier}"><h{level} id="{identifier}">{inner}</h{level}></a>'
 
 
