@@ -49,13 +49,13 @@ root = Path(".")
 def outdir() -> Path:
     if tempdir is None:
         raise RuntimeError("outdir called while tempdir is None")
-    return Path(mkdtemp(dir=str(tempdir)))
+    return Path(mkdtemp(dir=tempdir))
 
 
 def outfile() -> Path:
     if tempdir is None:
         raise RuntimeError("outdir called while tempdir is None")
-    return Path(mkstemp(dir=str(tempdir))[1])
+    return Path(mkstemp(dir=tempdir)[1])
 
 
 @dataclass
