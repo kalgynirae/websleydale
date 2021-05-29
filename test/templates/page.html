@@ -12,6 +12,18 @@
   <header>
     <h1>{{ page.title }}</h1>
   </header>
-  {{ page.content }}
+  {{ page.content | trim | safe }}
+  <footer>
+    Source info:
+    {% if source.is_committed %}
+      Last modified: <a href="{{ source.repo_url }}/commits/master/{{ source.repo_source_path }}">{{ source.updated_date.strftime("%Y-%m-%d") }}</a>
+      Contributors:
+      {% for author in source.authors %}
+      <a href="{{ author.url }}">{{ author.display_name }}</a>{% if not loop.last %},{% endif %}
+      {% endfor %}
+    {% else %}
+      [uncommitted]
+    {% endif %}
+  </footer>
 </body>
 </html>
