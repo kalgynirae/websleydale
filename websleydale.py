@@ -6,7 +6,7 @@ import asyncio
 import logging
 import os
 import shutil
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
@@ -162,7 +162,7 @@ class TextProducer:
 @dataclass(frozen=True)
 class Author:
     display_name: str
-    email: str
+    emails: Set[str] = field(hash=False)
     url: Optional[str]
 
 
@@ -261,9 +261,9 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
         datestr, email, name = line.split(maxsplit=2)
         if date is None:
             date = datetime.fromisoformat(datestr)
-        author = next((a for a in site.known_authors if a.email == email), None)
+        author = next((a for a in site.known_authors if email in a.emails), None)
         if author is None:
-            author = Author(display_name=name, email=email, url=None)
+            author = Author(display_name=name, emails={email}, url=None)
         authors[author] = None
 
     return GitFileInfo(
