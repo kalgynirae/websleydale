@@ -8,6 +8,7 @@ import os
 import shutil
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from html import escape
 from itertools import chain
 from pathlib import Path
 from shlex import quote
@@ -126,7 +127,7 @@ async def copy(dest: Path, source_producer: FileProducer, info: Info) -> None:
         shutil.copy(source.path, dest)
 
 
-async def gather(awaitables: Iterable[Awaitable[None]],) -> List[Optional[Exception]]:
+async def gather(awaitables: Iterable[Awaitable[None]]) -> List[Optional[Exception]]:
     return cast(
         List[Optional[Exception]],
         await asyncio.gather(*awaitables, return_exceptions=True),
@@ -310,6 +311,21 @@ class fake(TextProducer):
         return TextResult(sourceinfo=sourceinfo, content="", pageinfo=self.pageinfo)
 
 
+class string(TextProducer):
+    def __init__(self, s: str) -> None:
+        self.s = s
+
+    async def run(self, info: Info) -> TextResult:
+        sourceinfo = SourceInfo(
+            authors=[],
+            is_committed=False,
+            repo_source_path=None,
+            repo_url=None,
+            updated_date=datetime.now(),
+        )
+        return TextResult(sourceinfo=sourceinfo, content=self.s, pageinfo={})
+
+
 class jinja(FileProducer):
     def __init__(self, source: TextProducer, template: str) -> None:
         self.source = source
@@ -370,6 +386,30 @@ class WebsleydaleHTMLRenderer(HTMLRenderer):
         inner = self.render_inner(token)
         identifier = self.ids.get_id(self.render_to_plain(token))
         return f'<a class=anchor href="#{identifier}"><h{level} id="{identifier}">{inner}</h{level}></a>'
+
+
+def index_page(paths: list[str]) -> jinja:
+    items = [f'  <li><a href="{escape(path)}">{escape(path, quote=False)}</a></li>\n' for path in paths]
+    content = string(f"<ul>\n{''.join(items)}</ul>")
+    return jinja(content, template="page.html")
+
+
+def index(tree: Dict[str, FileProducer], *dirs: str) -> Dict[str, FileProducer]:
+    index_paths = {dir: [] for dir in dirs}
+    for dest, source in tree.items():
+        for dir, paths in index_paths.items():
+            try:
+                relpath = Path(dest).relative_to(dir)
+            except ValueError:
+                pass
+            else:
+                paths.append(str(relpath))
+    return {
+        **tree,
+        **{
+            f"{dir}/index.html": index_page(paths) for dir, paths in index_paths.items()
+        },
+    }
 
 
 if __name__ == "__main__":
