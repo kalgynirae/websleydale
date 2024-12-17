@@ -268,7 +268,7 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
         authors[author] = None
 
     return GitFileInfo(
-        authors=list(authors.keys()),
+        authors=list(reversed(authors.keys())),
         repo_source_path=repo_source_path,
         repo_url=repo_url,
         updated_date=date,
