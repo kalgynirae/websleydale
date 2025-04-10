@@ -390,7 +390,7 @@ class WebsleydaleHTMLRenderer(HTMLRenderer):
 
 def index_page(paths: list[str]) -> jinja:
     items = [f'  <li><a href="{escape(path)}">{escape(path, quote=False)}</a></li>\n' for path in paths]
-    content = string(f"<ul>\n{''.join(items)}</ul>")
+    content = string(f"<ul class=index>\n{''.join(items)}</ul>")
     return jinja(content, template="page.html")
 
 
