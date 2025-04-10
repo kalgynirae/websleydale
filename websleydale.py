@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import shutil
+from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from html import escape
@@ -17,7 +18,6 @@ from tempfile import mkdtemp, mkstemp
 from typing import (
     Any,
     Awaitable,
-    Counter,
     Dict,
     Iterable,
     List,
@@ -256,7 +256,7 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
     if proc.returncode != 0:
         raise RuntimeError("git failed")
 
-    authors: Dict[Author, None] = {}
+    authors: Counter[Author] = Counter()
     date = None
     for line in stdout.decode(errors="replace").splitlines():
         datestr, email, name = line.split(maxsplit=2)
@@ -265,10 +265,10 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
         author = next((a for a in site.known_authors if email in a.emails), None)
         if author is None:
             author = Author(display_name=name, emails={email}, url=None)
-        authors[author] = None
+        authors[author] += 1
 
     return GitFileInfo(
-        authors=list(reversed(authors.keys())),
+        authors=[a for a, _ in authors.most_common()],
         repo_source_path=repo_source_path,
         repo_url=repo_url,
         updated_date=date,
