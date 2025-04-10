@@ -170,6 +170,7 @@ class Author:
 @dataclass
 class GitFileInfo:
     authors: List[Author]
+    repo_name: Optional[str]
     repo_source_path: Optional[str]
     repo_url: Optional[str]
     updated_date: Optional[datetime]
@@ -179,6 +180,7 @@ class GitFileInfo:
 class SourceInfo:
     authors: List[Author]
     is_committed: bool
+    repo_name: Optional[str]
     repo_source_path: Optional[str]
     repo_url: Optional[str]
     updated_date: datetime
@@ -196,6 +198,7 @@ class file(FileProducer):
         sourceinfo = SourceInfo(
             authors=gitinfo.authors,
             is_committed=gitinfo.updated_date is not None,
+            repo_name=gitinfo.repo_name,
             repo_source_path=gitinfo.repo_source_path,
             repo_url=gitinfo.repo_url,
             updated_date=gitinfo.updated_date or datetime.now(),
@@ -233,6 +236,7 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
     if proc.returncode != 0:
         raise RuntimeError("git failed")
 
+    repo_name = None
     repo_url = None
     for line in stdout.decode(errors="replace").splitlines():
         remote_name, remote_url, _ = line.split(maxsplit=2)
@@ -245,6 +249,8 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
         if repo_url.startswith("git@github.com:"):
             repo_name = repo_url[len("git@github.com:") :]
             repo_url = f"https://github.com/{repo_name}"
+    if not repo_name:
+        repo_name = "/".join(repo_url.split("/")[-2:])
 
     args = [
         "bash",
@@ -269,6 +275,7 @@ async def _git_file_info(file: Path, site: Site) -> GitFileInfo:
 
     return GitFileInfo(
         authors=[a for a, _ in authors.most_common()],
+        repo_name=repo_name,
         repo_source_path=repo_source_path,
         repo_url=repo_url,
         updated_date=date,
@@ -304,6 +311,7 @@ class fake(TextProducer):
         sourceinfo = SourceInfo(
             authors=[],
             is_committed=False,
+            repo_name=None,
             repo_source_path="",
             repo_url=None,
             updated_date=datetime.now(),
@@ -319,6 +327,7 @@ class string(TextProducer):
         sourceinfo = SourceInfo(
             authors=[],
             is_committed=False,
+            repo_name=None,
             repo_source_path=None,
             repo_url=None,
             updated_date=datetime.now(),
