@@ -68,4 +68,4 @@ build(site, dest="out")
 
 For a full example, see [lumeh.org's config].
 
-[lumeh.org's config]: https://github.com/kalgynirae/lumeh.org/blob/master/websleydalerc.py
+[lumeh.org's config]: https://github.com/kalgynirae/lumeh.org/blob/51ef1cf33045ab27dcb08a14b3b9ea3b437baf7a/websleydalerc.py
