@@ -5,6 +5,11 @@ it is fairly minimal and runs very fast.
 [static site generator]: https://en.wikipedia.org/wiki/Static_web_page
 [lumeh.org]: https://lumeh.org/
 
+**UPDATE (April 2025):** Websleydale has been moved into the [lumeh.org
+repo]. This repository will no longer be updated.
+
+[lumeh.org repo]: https://github.com/kalgynirae/lumeh.org
+
 # Requirements
 
 * Python 3.8 or later
